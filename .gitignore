@@ -1,0 +1,11 @@
+# Godot 4 cache and generated files
+.godot/
+/android/
+
+# Claude Code personal settings
+.claude/settings.local.json
+
+# OS / OneDrive clutter
+desktop.ini
+Thumbs.db
+.DS_Store
