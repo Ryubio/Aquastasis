@@ -77,6 +77,11 @@ Palette: background #0B0F19 / #111827. Healthy = bioluminescent turquoise-green 
 - API honesty: if you are not 100% sure an API exists in Godot 4.3, DO NOT invent it. Use a well-known safe alternative and add a `# SAFE-FALLBACK` comment.
 - Self-review: after writing, re-read every file for syntax errors, missing `class_name`/autoload references, null references, wrong node paths, signal name mismatches, and type errors. List any residual risks at the end.
 - Every script starts with a 2-3 line comment describing its responsibility.
+- - CRASH PREVENTION RULES (Godot 4.3 strictness):
+  1. Set `render_mode cull_disabled;` in `sea.gdshader` and `cull_mode = BaseMaterial3D.CULL_DISABLED` on extruded meshes so polygon winding order never hides geometry. If `Geometry2D.triangulate_polygon()` returns an empty array, fall back to a triangle fan from the polygon centroid.
+  2. Never assign an untyped `Array` expression directly to a typed `Array[Type]` variable (causes Godot 4.3 Parse Error).
+  3. Autoload registration order in `project.godot` MUST be: `EventBus`, `Balance`, `I18n`, `GameState`.
+  4. When outputting large data files (`i18n.gd`, `tech_tree.gd`, `events.gd`), output ONLY 1-2 files in that message so you never hit output token limits.
 - File structure:
   project.godot
   main.tscn
