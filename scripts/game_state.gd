@@ -155,8 +155,9 @@ func get_region(region_id: String) -> Dictionary:
 	return sim.region_dict(region_id)
 
 
+## A copy of the region id list (the constant itself is read-only).
 func region_ids() -> Array:
-	return RegionData.IDS
+	return RegionData.IDS.duplicate()
 
 
 # --- Publishing -----------------------------------------------------------------------
