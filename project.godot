@@ -1,0 +1,33 @@
+; Engine configuration file.
+; Pulse of the Mediterranean - COP31 Antalya hackathon prototype.
+; Autoload order is mandatory: EventBus, Balance, I18n, GameState.
+
+config_version=5
+
+[application]
+
+config/name="Pulse of the Mediterranean"
+config/description="COP31 Antalya - The Reverse Pandemic"
+run/main_scene="res://main.tscn"
+config/features=PackedStringArray("4.3", "Forward Plus")
+
+[autoload]
+
+EventBus="*res://scripts/event_bus.gd"
+Balance="*res://scripts/balance.gd"
+I18n="*res://scripts/i18n.gd"
+GameState="*res://scripts/game_state.gd"
+
+[display]
+
+window/size/viewport_width=1920
+window/size/viewport_height=1080
+window/stretch/mode="canvas_items"
+window/stretch/aspect="keep"
+
+[rendering]
+
+renderer/rendering_method="forward_plus"
+renderer/rendering_method.mobile="forward_plus"
+anti_aliasing/quality/msaa_3d=2
+environment/defaults/default_clear_color=Color(0.0431, 0.0588, 0.098, 1)

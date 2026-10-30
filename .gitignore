@@ -9,3 +9,6 @@
 desktop.ini
 Thumbs.db
 .DS_Store
+
+# Dev screenshots / movie frames
+shots/
