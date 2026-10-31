@@ -390,3 +390,39 @@ static func draw_brackets(ci: CanvasItem, rect: Rect2, color: Color, arm: float 
 static func glow_line(ci: CanvasItem, a: Vector2, b: Vector2, color: Color, width: float = 1.5) -> void:
 	ci.draw_line(a, b, with_alpha(color, color.a * 0.18), width * 4.0, true)
 	ci.draw_line(a, b, color, width, true)
+
+
+# --- PHASE 2 HUD ADDITIONS (append only: ticker, bubbles, key hints) ------------------
+const SCIENCE_BLUE := Color(0.42, 0.78, 1.0)
+const BUBBLE_SCIENCE := Color(0.30, 0.86, 1.0)       # turquoise-blue data bubble
+const BUBBLE_POLITICAL := Color(1.0, 0.72, 0.26)     # amber support bubble
+
+
+## News tone: -1 alarming (red), 0 neutral (amber), 1 hopeful (turquoise).
+static func tone_color(tone: int) -> Color:
+	if tone < 0:
+		return CRISIS
+	if tone > 0:
+		return HEALTHY
+	return AMBER
+
+
+## Small keyboard-key chip (Q / W / E / T hints): thin border, thicker bottom edge.
+static func keycap_box(accent: Color) -> StyleBoxFlat:
+	var sb := panel_box(with_alpha(accent, 0.7), with_alpha(DEEP, 0.85), 1, Color(0, 0, 0, 0), 0, 3)
+	sb.border_width_bottom = 2
+	_margins(sb, 6.0, 1.0)
+	return sb
+
+
+## Dashed straight line (call from a draw callback of `ci`).
+static func dashed_line(ci: CanvasItem, a: Vector2, b: Vector2, color: Color, width: float = 1.0, dash: float = 5.0, gap: float = 4.0) -> void:
+	var length: float = a.distance_to(b)
+	if length < 0.5:
+		return
+	var dir: Vector2 = (b - a) / length
+	var d: float = 0.0
+	while d < length:
+		var e: float = minf(d + dash, length)
+		ci.draw_line(a + dir * d, a + dir * e, color, width, true)
+		d += dash + gap

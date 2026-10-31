@@ -1,7 +1,8 @@
 extends Control
-## Charts: _draw()-based data displays for the HUD and menus. One script, four kinds:
+## Charts: _draw()-based data displays for the HUD and menus. One script, five kinds:
 ## "bar" (segmented stat bar with number tick-up and change trail), "gauge" (+1.5..+4.0 °C
-## arc gauge with danger zone and animated needle), "timeline" (2026-2046) and "pulse" (ECG).
+## arc gauge with danger zone and animated needle), "timeline" (2026-2046), "pulse" (ECG)
+## and "line" (live Sea Health vs Crisis chart over 2026-2046 with the 60% goal line).
 
 const UITheme := preload("res://scripts/ui_theme.gd")
 
@@ -20,6 +21,11 @@ var alert: bool = false                # bar blinks (e.g. critical value)
 var pulse_health: float = 50.0         # pulse: 0-100, drives color and heart rate
 var start_year: int = 2026
 var end_year: int = 2046
+var series: Array = []                 # line: [[tick, sea_health, crisis], ...] (GameState.get_history())
+var total_ticks: int = 1000            # line: ticks from start_year to end_year
+var goal_value: float = 60.0           # line: dashed goal line
+var health_color: Color = UITheme.HEALTHY
+var crisis_color: Color = UITheme.CRISIS
 
 var _target: float = 0.0
 var _shown: float = 0.0
@@ -29,6 +35,14 @@ var _flash: float = 0.0
 var _time: float = 0.0
 var _phase: float = 0.0
 var _has_value: bool = false
+# Line chart live head (eases toward the latest snapshot between history samples).
+var _has_head: bool = false
+var _head_tick: float = 0.0
+var _head_h: float = 0.0
+var _head_c: float = 0.0
+var _tgt_tick: float = 0.0
+var _tgt_h: float = 0.0
+var _tgt_c: float = 0.0
 
 
 func _init() -> void:
@@ -77,6 +91,38 @@ func setup_pulse(min_size: Vector2) -> void:
 	custom_minimum_size = min_size
 
 
+func setup_line(min_size: Vector2) -> void:
+	kind = "line"
+	min_value = 0.0
+	max_value = 100.0
+	custom_minimum_size = min_size
+	size_flags_horizontal = Control.SIZE_EXPAND_FILL
+
+
+## Line chart data: sampled history plus the live values of the current tick (the head of
+## both lines eases toward them, so the chart grows smoothly between samples).
+func set_series(points: Array, live_tick: int, live_health: float, live_crisis: float) -> void:
+	series = points
+	var t: float = float(maxi(live_tick, 0))
+	if not _has_head or t < _tgt_tick - 0.5:
+		_head_tick = t
+		_head_h = live_health
+		_head_c = live_crisis
+		_has_head = true
+	_tgt_tick = t
+	_tgt_h = live_health
+	_tgt_c = live_crisis
+	queue_redraw()
+
+
+func reset_series() -> void:
+	series = []
+	_has_head = false
+	_head_tick = 0.0
+	_tgt_tick = 0.0
+	queue_redraw()
+
+
 ## New target value; the display ticks toward it. instant skips the animation.
 func set_value(v: float, instant: bool = false) -> void:
 	var nv: float = clampf(v, min_value, max_value)
@@ -123,6 +169,13 @@ func _process(delta: float) -> void:
 		var rate: float = lerpf(2.3, 0.85, clampf(pulse_health / 100.0, 0.0, 1.0))
 		_phase += delta * rate
 		dirty = true
+	elif kind == "line":
+		if _has_head:
+			var k: float = 1.0 - exp(-delta * 7.0)
+			_head_tick = lerpf(_head_tick, _tgt_tick, k)
+			_head_h = lerpf(_head_h, _tgt_h, k)
+			_head_c = lerpf(_head_c, _tgt_c, k)
+		dirty = true
 	elif kind == "gauge" or kind == "timeline" or alert:
 		dirty = true
 	if dirty and is_visible_in_tree():
@@ -158,6 +211,8 @@ func _draw() -> void:
 			_draw_timeline()
 		"pulse":
 			_draw_pulse()
+		"line":
+			_draw_line_chart()
 
 
 # --- Bar ---------------------------------------------------------------------------
@@ -406,3 +461,143 @@ func _draw_pulse() -> void:
 	var head: Vector2 = pts[pts.size() - 1]
 	draw_circle(head, 4.0, UITheme.with_alpha(col, 0.3))
 	draw_circle(head, 2.0, col.lerp(Color.WHITE, 0.5))
+
+
+# --- Line chart (Sea Health vs Crisis, 2026-2046) ---------------------------------------
+
+func _chart_pos(plot: Rect2, tick: float, v: float) -> Vector2:
+	var fx: float = clampf(tick / float(maxi(total_ticks, 1)), 0.0, 1.0)
+	var fy: float = clampf((v - min_value) / maxf(max_value - min_value, 0.0001), 0.0, 1.0)
+	return Vector2(plot.position.x + plot.size.x * fx, plot.end.y - plot.size.y * fy)
+
+
+## Points of one series (column 1 = sea health, 2 = crisis) up to the live head.
+func _line_points(column: int, plot: Rect2, live_v: float) -> PackedVector2Array:
+	var pts := PackedVector2Array()
+	var last_tick: float = -1.0
+	for s in series:
+		var row: Array = s
+		if row.size() <= column:
+			continue
+		var tk: float = float(row[0])
+		if _has_head and tk > _head_tick + 0.01:
+			break
+		if tk <= last_tick:
+			continue
+		pts.append(_chart_pos(plot, tk, float(row[column])))
+		last_tick = tk
+	if _has_head and _head_tick > last_tick + 0.01:
+		pts.append(_chart_pos(plot, _head_tick, live_v))
+	return pts
+
+
+func _draw_line_chart() -> void:
+	var w: float = size.x
+	var h: float = size.y
+	if w < 60.0 or h < 40.0:
+		return
+	var font: Font = UITheme.mono_font()
+	var fs: int = 10
+	var plot := Rect2(Vector2(24.0, 5.0), Vector2(w - 30.0, h - 21.0))
+	var years: int = maxi(end_year - start_year, 1)
+	var pulse: float = 0.5 + 0.5 * sin(_time * 4.0)
+
+	# Backdrop, the winning zone above the goal, grid and axis labels.
+	draw_rect(plot, UITheme.with_alpha(UITheme.DEEP, 0.55))
+	var gy: float = _chart_pos(plot, 0.0, goal_value).y
+	draw_rect(Rect2(plot.position, Vector2(plot.size.x, gy - plot.position.y)), UITheme.with_alpha(UITheme.HEALTHY, 0.045))
+	for k in 5:
+		var y: float = _chart_pos(plot, 0.0, float(k) * 25.0).y
+		var ga: float = 0.16 if k % 2 == 0 else 0.08
+		draw_line(Vector2(plot.position.x, y), Vector2(plot.end.x, y), UITheme.with_alpha(UITheme.TEXT_DIM, ga), 1.0)
+	for i in 5:
+		var x: float = plot.position.x + plot.size.x * float(i) / 4.0
+		draw_line(Vector2(x, plot.position.y), Vector2(x, plot.end.y + 3.0), UITheme.with_alpha(UITheme.TEXT_DIM, 0.12), 1.0)
+		var txt: String = str(start_year + int(roundf(float(years) * float(i) / 4.0)))
+		var tw: float = font.get_string_size(txt, HORIZONTAL_ALIGNMENT_LEFT, -1, fs).x
+		var tx: float = x - tw * 0.5
+		if i == 0:
+			tx = x - 2.0
+		elif i == 4:
+			tx = x - tw + 2.0
+		draw_string(font, Vector2(tx, h - 2.0), txt, HORIZONTAL_ALIGNMENT_LEFT, -1, fs, UITheme.TEXT_DIM)
+	_axis_label(font, fs, "100", plot.position.x, plot.position.y, UITheme.TEXT_DIM)
+	_axis_label(font, fs, str(roundi(goal_value)), plot.position.x, gy, UITheme.AMBER)
+	_axis_label(font, fs, "0", plot.position.x, plot.end.y, UITheme.TEXT_DIM)
+
+	# Years still to play are shaded.
+	var now_x: float = _chart_pos(plot, _head_tick if _has_head else 0.0, 0.0).x
+	if now_x < plot.end.x - 1.0:
+		draw_rect(Rect2(Vector2(now_x, plot.position.y), Vector2(plot.end.x - now_x, plot.size.y)), UITheme.with_alpha(UITheme.BG, 0.4))
+	UITheme.dashed_line(self, Vector2(plot.position.x, gy), Vector2(plot.end.x, gy), UITheme.with_alpha(UITheme.AMBER, 0.9), 1.2, 5.0, 4.0)
+
+	# Series: soft area fill under each line, glowing lines, pulsing heads with value tags.
+	var hp: PackedVector2Array = _line_points(1, plot, _head_h)
+	var cp: PackedVector2Array = _line_points(2, plot, _head_c)
+	_draw_area(cp, plot.end.y, crisis_color, 0.13)
+	_draw_area(hp, plot.end.y, health_color, 0.24)
+	_draw_series(cp, crisis_color, 1.6)
+	_draw_series(hp, health_color, 2.0)
+	if _has_head:
+		UITheme.dashed_line(self, Vector2(now_x, plot.position.y), Vector2(now_x, plot.end.y), UITheme.with_alpha(UITheme.AMBER, 0.4), 1.0, 2.0, 3.0)
+	if hp.size() > 0 and cp.size() > 0:
+		var ph: Vector2 = hp[hp.size() - 1]
+		var pc: Vector2 = cp[cp.size() - 1]
+		_draw_head(pc, crisis_color, pulse)
+		_draw_head(ph, health_color, pulse)
+		var yh: float = ph.y
+		var yc: float = pc.y
+		if absf(yh - yc) < 12.0:
+			var mid: float = (yh + yc) * 0.5
+			if yh <= yc:
+				yh = mid - 6.0
+				yc = mid + 6.0
+			else:
+				yh = mid + 6.0
+				yc = mid - 6.0
+		_head_tag(font, fs, str(roundi(_head_c)), Vector2(pc.x, yc), plot, crisis_color)
+		_head_tag(font, fs, str(roundi(_head_h)), Vector2(ph.x, yh), plot, health_color)
+	draw_rect(plot, UITheme.LINE_DIM, false, 1.0)
+
+
+func _axis_label(font: Font, fs: int, txt: String, plot_left: float, y: float, col: Color) -> void:
+	var tw: float = font.get_string_size(txt, HORIZONTAL_ALIGNMENT_LEFT, -1, fs).x
+	draw_string(font, Vector2(plot_left - 4.0 - tw, y + float(fs) * 0.35), txt, HORIZONTAL_ALIGNMENT_LEFT, -1, fs, col)
+
+
+## Vertical gradient under a line, as one quad per segment (no polygon triangulation).
+func _draw_area(pts: PackedVector2Array, base_y: float, col: Color, alpha: float) -> void:
+	if pts.size() < 2:
+		return
+	var top: Color = UITheme.with_alpha(col, alpha)
+	var bottom: Color = UITheme.with_alpha(col, 0.0)
+	var colors := PackedColorArray([top, top, bottom, bottom])
+	for i in pts.size() - 1:
+		var a: Vector2 = pts[i]
+		var b: Vector2 = pts[i + 1]
+		if b.x - a.x < 0.01:
+			continue
+		draw_primitive(PackedVector2Array([a, b, Vector2(b.x, base_y), Vector2(a.x, base_y)]), colors, PackedVector2Array())
+
+
+func _draw_series(pts: PackedVector2Array, col: Color, width: float) -> void:
+	if pts.size() < 2:
+		return
+	draw_polyline(pts, UITheme.with_alpha(col, 0.22), width * 3.0, true)
+	draw_polyline(pts, col, width, true)
+
+
+func _draw_head(p: Vector2, col: Color, pulse: float) -> void:
+	draw_circle(p, 5.0 + 2.5 * pulse, UITheme.with_alpha(col, 0.18 + 0.1 * pulse))
+	draw_circle(p, 2.6, col.lerp(Color.WHITE, 0.45))
+
+
+func _head_tag(font: Font, fs: int, txt: String, at: Vector2, plot: Rect2, col: Color) -> void:
+	var tw: float = font.get_string_size(txt, HORIZONTAL_ALIGNMENT_LEFT, -1, fs).x
+	var x: float = at.x + 8.0
+	if x + tw > plot.end.x - 2.0:
+		x = at.x - 8.0 - tw
+	var y: float = clampf(at.y + float(fs) * 0.35, plot.position.y + float(fs), plot.end.y - 2.0)
+	var p := Vector2(roundf(x), roundf(y))
+	draw_string_outline(font, p, txt, HORIZONTAL_ALIGNMENT_LEFT, -1, fs, 3, UITheme.with_alpha(UITheme.DEEP, 0.9))
+	draw_string(font, p, txt, HORIZONTAL_ALIGNMENT_LEFT, -1, fs, col.lerp(Color.WHITE, 0.3))

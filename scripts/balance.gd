@@ -16,7 +16,7 @@ const DEFAULT_SEED := 31
 const TEMP_START := 1.5            # degrees C above pre-industrial
 const TEMP_LOSE := 4.0
 const TEMP_BASE_RISE_PER_TICK := 0.0004
-const TEMP_CRISIS_RISE_PER_TICK := 0.0036   # multiplied by average crisis / 100
+const TEMP_CRISIS_RISE_PER_TICK := 0.0034   # multiplied by average crisis / 100
 const TEMP_STRESS_COEFF := 0.012     # extra pollution / stress per tick per degree above TEMP_START
 const TEMP_MILESTONES := [2.0, 2.5, 3.0, 3.5]  # toast when warming crosses each value
 const TEMP_ALARM_MILESTONE := 3.0  # milestones from here on are alarms (severity 3)
@@ -38,7 +38,7 @@ const PROTECT_COEFF := 0.0008          # x protection: pollution reduction (at L
 const AWARE_COEFF := 0.002             # x awareness: pollution reduction (at LEVER_POLLUTION_REF)
 const LEVER_POLLUTION_REF := 50.0      # lever reductions scale with pollution / this
 const BIO_SAFE_POLLUTION := 30.0       # below: clean water lets life regrow; above: damage
-const BIO_ROOM_EXPONENT := 1.5         # coral / seagrass recovery x (1 - value / 100) ^ this
+const BIO_ROOM_EXPONENT := 2.3         # coral / seagrass recovery x (1 - value / 100) ^ this
 const BIO_DIRTY_RECOVERY_CUT := 0.6    # protection-driven recovery x (1 - dirtiness x this)
 const CORAL_POLLUTION_DAMAGE := 0.05   # per tick at pollution 100 (0 at BIO_SAFE_POLLUTION)
 const CORAL_HEAT_DAMAGE := 0.012       # per tick per degree above TEMP_START
@@ -141,6 +141,42 @@ const PATROL_SATURATION := 0.8
 const CAMPAIGN_AWARENESS_GAIN := 18.0  # x (1 - awareness / 100 x CAMPAIGN_SATURATION)
 const CAMPAIGN_SATURATION := 1.0
 const CAMPAIGN_NEIGHBOR_SHARE := 0.5
+
+# --- Phase 2: policy tree economy ------------------------------------------------------
+const BLUE_CARBON_SEAGRASS := 60.0     # "blue_carbon" pays per tick per region with seagrass above this
+const HISTORY_EVERY := 10              # live chart: one [tick, sea_health, crisis] sample per this many ticks
+
+# --- Phase 2: crisis evolution (docs/ARCHITECTURE.md 11.4) ----------------------------
+const EVO_WINDOW := 12                 # the crisis remembers this many recent player moves
+const EVO_MIN_MOVES := 12              # ... and reads a strategy only once it has this many
+const EVO_SHARE := 0.6                 # one branch with at least this share evolves its resistance ...
+const EVO_ADAPT_TICKS := 110           # ... once that one-sided play has lasted this many ticks (66 s at 1x)
+const EVO_ADAPT_DECAY := 1.0           # adaptation lost per tick while the strategy is diverse again
+const EVO_WARN_AT := 0.5               # "crisis is adapting" toast at this share of EVO_ADAPT_TICKS
+const EVO_HEAT_TEMP := 2.7             # marine_heatwave evolves at this warming
+const EVO_SPREAD_COUNT := 24           # invasive_species evolves after this many spreads
+
+# --- Phase 2: decision events (11.5) -----------------------------------------------------
+const EVENT_FIRST_MIN := 65            # first random card between these ticks
+const EVENT_FIRST_MAX := 80
+const EVENT_INTERVAL_MIN := 105        # then one every EVENT_INTERVAL_MIN..MAX ticks
+const EVENT_INTERVAL_MAX := 140
+const EVENT_SUMMIT_GAP_TICKS := 35     # no random card this close before or after a COP31 summit
+
+# --- Phase 2: data bubbles (11.6) ----------------------------------------------------------
+const BUBBLE_CHANCE_PER_TICK := 0.08   # x bubble_rate_mult
+const BUBBLES_MAX := 4                 # alive at once
+const BUBBLE_TTL_TICKS := 30           # 18 s at 1x
+const BUBBLE_POLITICAL_SHARE := 0.25   # the rest are science bubbles
+const BUBBLE_SCIENCE_MIN := 3          # amount range before bubble_value_mult
+const BUBBLE_SCIENCE_MAX := 5
+const BUBBLE_POLITICAL_MIN := 2
+const BUBBLE_POLITICAL_MAX := 4
+const BUBBLE_AWARENESS_WEIGHT := 5.0   # political bubbles: region weight = awareness + this
+
+# --- Phase 2: news headlines (11.7) -----------------------------------------------------------
+const NEWS_SPREAD_GAP_TICKS := 40      # at most one spread headline per this many ticks
+const NEWS_ALERT_GAP_TICKS := 10       # region alarm / recovery headlines
 
 # --- Starting state per region (0-100) -----------------------------------------------
 const REGION_START := {

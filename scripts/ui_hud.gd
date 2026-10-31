@@ -1,11 +1,15 @@
 extends Control
-## UIHud: in-game HUD built in code - ticker strip reserve, top bar (year, timeline, speed,
-## resources), BASIN STATUS panel (bars + temperature gauge), REGION panel (status, six
-## stats, FIELD OPERATIONS), toast feed and a themed hover tip. Driven only by EventBus.
+## UIHud: in-game HUD built in code - news ticker strip, top bar (year, timeline, speed,
+## resources with net income per year), BASIN STATUS panel (bars, temperature gauge, live
+## trend chart, crisis resistances, evolution pressure), REGION panel (status, six stats,
+## FIELD OPERATIONS with Q/W/E hints, POLICY TREE button), toast feed and a themed hover tip.
+## Driven only by EventBus.
 
 const UITheme := preload("res://scripts/ui_theme.gd")
 const Icons := preload("res://scripts/icons.gd")
 const Charts := preload("res://scripts/charts.gd")
+const NewsTicker := preload("res://scripts/news_ticker.gd")
+const TechTree := preload("res://scripts/tech_tree.gd")
 
 const TICKER_H := 32.0
 const TOP_H := 60.0
@@ -14,11 +18,22 @@ const LEFT_W := 340.0
 const RIGHT_W := 404.0
 const PANEL_Y := 106.0
 const TOAST_W := 340.0
+const TOAST_AREA_H := 280.0
 const MAX_TOASTS := 4
 const TOAST_LIFE := 7.0
 
+const RES_BLOCK_W := 186.0
 const RES_ORDER := ["budget", "political", "science"]
 const RES_KEYS := {"budget": "hud.budget", "political": "hud.political", "science": "hud.science"}
+## Snapshot keys of the net income per tick (before spending) of each resource.
+const RATE_KEYS := {"budget": "budget_rate", "political": "political_rate", "science": "science_rate"}
+## Field operation hotkeys in Balance.ACTION_ORDER order (main.gd maps Q / W / E the same way).
+const ACTION_HOTKEYS := ["Q", "W", "E"]
+const HISTORY_EVERY := 10           # local chart samples if GameState.get_history() is empty
+const NEG_INCOME_WARN_TICKS := 5    # budget income negative this long -> warning toast
+const NEG_INCOME_REARM_TICKS := 60  # ... and positive this long before it may warn again
+const MAX_RESIST_COUNTERS := 2
+const MAX_RESIST_ROWS := 3
 const RES_COLORS := {
 	"budget": Color(0.9098, 0.6392, 0.2392),
 	"political": Color(0.95, 0.50, 0.36),
@@ -95,6 +110,38 @@ var _action_rows: Array = []        # Dictionary per action
 
 # Toasts: Dictionary {root, label, key, args}
 var _toasts: Array = []
+var _toast_avail: float = TOAST_AREA_H   # height of the toast feed area
+
+# Phase 2: news ticker, net income, live chart, resistances, evolution pressure, policy tree
+var _ticker: NewsTicker
+var _res_icons: Dictionary = {}     # key -> Icons
+var _rate_labels: Dictionary = {}   # key -> Label ("+75/yr")
+var _rate_values: Dictionary = {}   # key -> net income per year (float), missing = unknown
+var _budget_negative: bool = false
+var _neg_ticks: int = 0
+var _pos_ticks: int = 0
+var _neg_warned: bool = false
+var _chart: Charts
+var _local_hist: Array = []         # [[tick, sea_health, crisis], ...] fallback samples
+var _resist_icon: Icons
+var _resist_title: Label
+var _resist_badge: PanelContainer
+var _resist_count: Label
+var _resist_list: VBoxContainer
+var _resist_none: Label
+var _resist_more: Label             # "Also active: N" past MAX_RESIST_ROWS
+var _resist_ids: Array = []         # evolution ids currently listed
+var _resist_flash: float = 0.0
+var _pressure_box: PanelContainer
+var _pressure_icon: Icons
+var _pressure_label: Label
+var _pressure_bar: Charts
+var _pressure_branch: String = ""
+var _tree_btn: Button
+var _tree_icon: Icons
+var _tree_status: Label
+var _tree_open: bool = false
+var _adoptable: int = 0
 
 
 func _ready() -> void:
@@ -119,9 +166,15 @@ func _ready() -> void:
 	EventBus.toast.connect(_on_toast)
 	EventBus.action_performed.connect(_on_action_performed)
 	EventBus.language_changed.connect(_on_language_changed)
+	EventBus.evolution_happened.connect(_on_evolution_happened)
+	EventBus.evolution_cured.connect(_on_evolution_cured)
+	EventBus.node_adopted.connect(_on_node_adopted)
+	EventBus.tree_toggled.connect(_on_tree_toggled)
 
 	_select_region(GameState.selected_region)
 	_on_speed_changed(GameState.speed_index)
+	_refresh_resistances(false)
+	_update_tree_status()
 
 
 # --- Small builders ------------------------------------------------------------------
@@ -206,7 +259,7 @@ func _on_btn_down(btn: BaseButton) -> void:
 		UITheme.press_fx(btn)
 
 
-# --- Ticker strip (reserved for the Phase 2 news ticker) -------------------------------
+# --- Ticker strip (news marquee) --------------------------------------------------------
 
 func _build_ticker_strip() -> void:
 	_ticker_strip = Control.new()
@@ -217,6 +270,9 @@ func _build_ticker_strip() -> void:
 	_ticker_strip.offset_bottom = TICKER_H
 	_ticker_strip.draw.connect(_draw_ticker_strip)
 	add_child(_ticker_strip)
+	_ticker = NewsTicker.new()
+	_ticker.name = "NewsTicker"
+	_ticker_strip.add_child(_ticker)
 
 
 func _draw_ticker_strip() -> void:
@@ -334,22 +390,36 @@ func _build_top_bar() -> void:
 	speed_row.add_child(_paused_chip)
 	row.add_child(_vline(40.0))
 
-	# Resources.
+	# Resources: icon, tick-up value, net income per year, name. Hover explains the rate.
 	for k in RES_ORDER:
 		var key: String = k
 		var col: Color = RES_COLORS[key]
 		var block := _hbox(8)
-		block.custom_minimum_size = Vector2(176.0, 0.0)
+		block.custom_minimum_size = Vector2(RES_BLOCK_W, 0.0)
+		block.mouse_filter = Control.MOUSE_FILTER_PASS
+		block.mouse_entered.connect(_on_res_hover.bind(block, key))
+		block.mouse_exited.connect(_hide_tip.bind(block))
 		row.add_child(block)
-		block.add_child(_icon(key, col, 28.0))
+		var res_icon := _icon(key, col, 28.0)
+		block.add_child(res_icon)
+		_res_icons[key] = res_icon
 		var col_box := _vbox(0)
 		col_box.alignment = BoxContainer.ALIGNMENT_CENTER
 		col_box.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 		block.add_child(col_box)
+		var val_row := _hbox(7)
+		col_box.add_child(val_row)
 		var v := _label("ValueLabel")
 		v.add_theme_color_override("font_color", col.lerp(Color.WHITE, 0.25))
 		v.text = "0"
-		col_box.add_child(v)
+		val_row.add_child(v)
+		var rate := _label("SmallLabel")
+		rate.add_theme_font_override("font", UITheme.mono_bold_font())
+		rate.add_theme_font_size_override("font_size", 12)
+		rate.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+		rate.visible = false
+		val_row.add_child(rate)
+		_rate_labels[key] = rate
 		var n := _label("DimLabel", RES_KEYS[key])
 		n.add_theme_font_size_override("font_size", 11)
 		_ellipsis(n)
@@ -397,7 +467,7 @@ func _build_left_panel() -> void:
 	inset.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	col.add_child(inset)
 	_gauge = Charts.new()
-	_gauge.setup_gauge(Vector2(280.0, 176.0))
+	_gauge.setup_gauge(Vector2(280.0, 158.0))
 	inset.add_child(_gauge)
 	_gauge.set_value(1.5, true)
 
@@ -418,6 +488,131 @@ func _build_left_panel() -> void:
 	gl.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	gl.custom_minimum_size = Vector2(200.0, 0.0)
 	goal.add_child(gl)
+	col.add_child(_sep())
+	_build_chart_section(col)
+	col.add_child(_sep())
+	_build_resist_section(col)
+
+
+## LIVE TREND: legend (wraps for long languages) and the Sea Health vs Crisis line chart.
+func _build_chart_section(col: VBoxContainer) -> void:
+	var head := _hbox(8)
+	col.add_child(head)
+	head.add_child(_icon("clock", UITheme.AMBER, 16.0))
+	var title := _label("HeaderLabel", "hud.chart.title")
+	_ellipsis(title)
+	head.add_child(title)
+	var legend := HFlowContainer.new()
+	legend.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	legend.add_theme_constant_override("h_separation", 14)
+	legend.add_theme_constant_override("v_separation", 2)
+	col.add_child(legend)
+	_legend_item(legend, UITheme.HEALTHY, false, "hud.chart.health")
+	_legend_item(legend, UITheme.CRISIS, false, "hud.chart.crisis")
+	_legend_item(legend, UITheme.AMBER, true, "hud.chart.goal")
+	var inset := _panel("InsetPanel")
+	inset.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	inset.add_theme_stylebox_override("panel", _inset_box(6.0, 6.0))
+	col.add_child(inset)
+	_chart = Charts.new()
+	_chart.setup_line(Vector2(260.0, 104.0))
+	_chart.total_ticks = Balance.TOTAL_TICKS
+	_chart.start_year = Balance.START_YEAR
+	_chart.end_year = Balance.END_YEAR
+	_chart.goal_value = Balance.WIN_SEA_HEALTH
+	inset.add_child(_chart)
+
+
+func _inset_box(h: float, v: float) -> StyleBoxFlat:
+	var sb := UITheme.panel_box(UITheme.LINE_DIM, UITheme.with_alpha(UITheme.DEEP, 0.75), 1, Color(0, 0, 0, 0), 0, 6)
+	sb.content_margin_left = h
+	sb.content_margin_right = h
+	sb.content_margin_top = v
+	sb.content_margin_bottom = v
+	return sb
+
+
+func _legend_item(parent: Control, col: Color, dashed: bool, key: String) -> void:
+	var item := _hbox(5)
+	parent.add_child(item)
+	var sw := Control.new()
+	sw.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	sw.custom_minimum_size = Vector2(16.0, 10.0)
+	sw.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	sw.draw.connect(_draw_swatch.bind(sw, col, dashed))
+	item.add_child(sw)
+	var l := _label("DimLabel", key)
+	l.add_theme_font_size_override("font_size", 11)
+	item.add_child(l)
+
+
+func _draw_swatch(sw: Control, col: Color, dashed: bool) -> void:
+	var y: float = roundf(sw.size.y * 0.5)
+	if dashed:
+		UITheme.dashed_line(sw, Vector2(0.0, y), Vector2(sw.size.x, y), col, 1.5, 4.0, 3.0)
+		return
+	sw.draw_line(Vector2(0.0, y), Vector2(sw.size.x, y), UITheme.with_alpha(col, 0.25), 5.0, true)
+	sw.draw_line(Vector2(0.0, y), Vector2(sw.size.x, y), col, 2.0, true)
+
+
+## CRISIS RESISTANCES: active evolutions with their counter policies, plus the pressure
+## warning that appears before a one-sided strategy provokes a new one.
+func _build_resist_section(col: VBoxContainer) -> void:
+	var head := _hbox(8)
+	col.add_child(head)
+	_resist_icon = _icon(_icon_or("evolution", "crisis"), UITheme.TERRACOTTA.lerp(UITheme.CRISIS, 0.4), 16.0)
+	head.add_child(_resist_icon)
+	_resist_title = _label("HeaderLabel", "hud.resist.title")
+	_ellipsis(_resist_title)
+	head.add_child(_resist_title)
+	_resist_badge = PanelContainer.new()
+	_resist_badge.theme_type_variation = &"BadgePanel"
+	_resist_badge.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_resist_badge.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	_resist_count = _label("BadgeLabel")
+	_resist_count.text = "0"
+	_resist_badge.add_child(_resist_count)
+	head.add_child(_resist_badge)
+
+	_resist_list = _vbox(6)
+	col.add_child(_resist_list)
+	_resist_none = _label("DimLabel", "hud.resist.none")
+	_resist_none.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	_resist_none.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	_resist_none.custom_minimum_size = Vector2(220.0, 0.0)
+	_resist_list.add_child(_resist_none)
+
+	_resist_more = _label("DimLabel")
+	_resist_more.visible = false
+	_resist_list.add_child(_resist_more)
+
+	_pressure_box = PanelContainer.new()
+	_pressure_box.mouse_filter = Control.MOUSE_FILTER_STOP
+	_pressure_box.add_theme_stylebox_override("panel", UITheme.stripe_box(UITheme.WARNING, 0.75))
+	_pressure_box.visible = false
+	_pressure_box.mouse_entered.connect(_on_pressure_hover)
+	_pressure_box.mouse_exited.connect(_hide_tip.bind(_pressure_box))
+	col.add_child(_pressure_box)
+	var pcol := _vbox(5)
+	_pressure_box.add_child(pcol)
+	var prow := _hbox(8)
+	pcol.add_child(prow)
+	_pressure_icon = _icon("warning", UITheme.WARNING, 16.0)
+	prow.add_child(_pressure_icon)
+	_pressure_label = _label("SmallLabel")
+	_pressure_label.add_theme_color_override("font_color", UITheme.WARNING.lerp(Color.WHITE, 0.3))
+	_pressure_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	_pressure_label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	_pressure_label.custom_minimum_size = Vector2(200.0, 0.0)
+	prow.add_child(_pressure_label)
+	_pressure_bar = Charts.new()
+	_pressure_bar.setup_bar("fixed", UITheme.WARNING, 8.0)
+	pcol.add_child(_pressure_bar)
+	_pressure_bar.set_value(0.0, true)
+
+
+func _on_pressure_hover() -> void:
+	_show_tip(_pressure_box, _pressure_label.text, I18n.t("hud.pressure.hint"), "", "right_of")
 
 
 ## Icon + name + tick-up value, then a segmented bar. Returns the bar.
@@ -527,6 +722,65 @@ func _build_right_panel() -> void:
 	ops_head.add_child(ops_title)
 	for a in Balance.ACTION_ORDER:
 		_build_action_row(col, str(a))
+	col.add_child(_sep())
+	_build_tree_button(col)
+
+
+## POLICY TREE button: opens the tree (main.gd decides), shows how many policies are
+## adoptable right now and the T hotkey; pressed while the tree is open.
+func _build_tree_button(col: VBoxContainer) -> void:
+	_tree_btn = Button.new()
+	_tree_btn.toggle_mode = true
+	_tree_btn.custom_minimum_size = Vector2(0.0, 60.0)
+	_wire_button(_tree_btn)
+	_tree_btn.mouse_entered.connect(_on_tree_hover)
+	_tree_btn.mouse_exited.connect(_hide_tip.bind(_tree_btn))
+	_tree_btn.pressed.connect(_on_tree_pressed)
+	col.add_child(_tree_btn)
+	var row := _hbox(12)
+	row.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	row.offset_left = 12.0
+	row.offset_right = -12.0
+	row.offset_top = 6.0
+	row.offset_bottom = -6.0
+	_tree_btn.add_child(row)
+	_tree_icon = _icon(_icon_or("tree", "globe"), UITheme.AMBER, 36.0)
+	row.add_child(_tree_icon)
+	var mid := _vbox(2)
+	mid.alignment = BoxContainer.ALIGNMENT_CENTER
+	mid.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	row.add_child(mid)
+	var title := _label("HeaderLabel", "hud.tree.button")
+	title.add_theme_font_size_override("font_size", 15)
+	title.add_theme_color_override("font_color", UITheme.AMBER.lerp(Color.WHITE, 0.25))
+	_ellipsis(title)
+	mid.add_child(title)
+	_tree_status = _label("DimLabel")
+	_ellipsis(_tree_status)
+	mid.add_child(_tree_status)
+	row.add_child(_keycap("T", UITheme.AMBER))
+
+
+## Keyboard hint chip ("Q", "T") drawn like a small key.
+func _keycap(key_text: String, accent: Color) -> PanelContainer:
+	var p := PanelContainer.new()
+	p.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	p.add_theme_stylebox_override("panel", UITheme.keycap_box(accent))
+	p.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	var l := _label("SmallLabel")
+	l.text = key_text
+	l.add_theme_font_override("font", UITheme.mono_bold_font())
+	l.add_theme_font_size_override("font_size", 12)
+	l.add_theme_color_override("font_color", accent.lerp(Color.WHITE, 0.35))
+	l.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	l.custom_minimum_size = Vector2(10.0, 0.0)
+	p.add_child(l)
+	return p
+
+
+## preferred if icons.gd draws it already, else a known icon (new ids land in Phase 2).
+func _icon_or(preferred: String, fallback: String) -> String:
+	return preferred if Icons.IDS.has(preferred) else fallback
 
 
 func _stat_tint(data_key: String) -> Color:
@@ -592,11 +846,20 @@ func _build_action_row(parent: Control, action_id: String) -> void:
 	mid.alignment = BoxContainer.ALIGNMENT_CENTER
 	mid.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	row.add_child(mid)
+	var name_row := _hbox(7)
+	mid.add_child(name_row)
+	var idx: int = Balance.ACTION_ORDER.find(action_id)
+	var hotkey: String = ""
+	var cap: PanelContainer = null
+	if idx >= 0 and idx < ACTION_HOTKEYS.size():
+		hotkey = ACTION_HOTKEYS[idx]
+		cap = _keycap(hotkey, UITheme.HEALTHY)
+		name_row.add_child(cap)
 	var name_l := _label("SmallLabel")
 	name_l.add_theme_font_override("font", UITheme.mono_bold_font())
 	name_l.add_theme_font_size_override("font_size", 15)
 	_ellipsis(name_l)
-	mid.add_child(name_l)
+	name_row.add_child(name_l)
 	var status_l := _label("DimLabel")
 	_ellipsis(status_l)
 	mid.add_child(status_l)
@@ -649,6 +912,8 @@ func _build_action_row(parent: Control, action_id: String) -> void:
 		"status": status_l,
 		"cost": cost_labels,
 		"cd": cd_fill,
+		"keycap": cap,
+		"hotkey": hotkey,
 		"name_key": str(def.get("name_key", "")),
 		"desc_key": str(def.get("desc_key", "")),
 	})
@@ -667,17 +932,34 @@ func _on_right_panel_draw() -> void:
 func _build_toasts() -> void:
 	_toast_box = _vbox(8)
 	_toast_box.alignment = BoxContainer.ALIGNMENT_END
-	_toast_box.position = Vector2(MARGIN, 660.0)
+	_toast_box.position = Vector2(MARGIN + LEFT_W + 18.0, 1080.0 - 20.0 - TOAST_AREA_H)
 	_toast_box.size = Vector2(TOAST_W, 396.0)
 	add_child(_toast_box)
 	_left_panel.resized.connect(_layout_toasts)
 
 
+## The toast feed sits in the empty bottom-left corner of the map, right of the BASIN
+## STATUS column (which grows with the chart and resistances), clear of the sea regions.
 func _layout_toasts() -> void:
 	var vh: float = get_viewport_rect().size.y
-	var top: float = _left_panel.position.y + _left_panel.size.y + 14.0
-	_toast_box.position = Vector2(MARGIN, top)
-	_toast_box.size = Vector2(TOAST_W, maxf(vh - top - 20.0, 120.0))
+	_toast_avail = TOAST_AREA_H
+	_toast_box.position = Vector2(MARGIN + LEFT_W + 18.0, vh - 20.0 - _toast_avail)
+	_toast_box.size = Vector2(TOAST_W, _toast_avail)
+
+
+## The taller BASIN STATUS panel leaves less room: drop the oldest toast while the feed
+## would overflow the screen bottom (one per frame; the freed node leaves next frame).
+func _guard_toasts() -> void:
+	if _toasts.size() <= 1:
+		return
+	if _toast_box.get_combined_minimum_size().y <= _toast_avail + 1.0:
+		return
+	var oldest: Dictionary = _toasts[0]
+	var root: Control = oldest["root"]
+	_drop_toast(root)
+	if is_instance_valid(root) and root.get_parent() == _toast_box:
+		_toast_box.remove_child(root)
+	_layout_toasts()
 
 
 func _build_tip() -> void:
@@ -737,6 +1019,9 @@ func _place_tip() -> void:
 	elif _tip_side == "under_panel":
 		# Below the REGION panel, clear of the sea regions (east edge ~x 1465 at 1080p).
 		p = Vector2(_right_panel.position.x + (_right_panel.size.x - ts.x) * 0.5, _right_panel.position.y + _right_panel.size.y + 10.0)
+	elif _tip_side == "right_of":
+		# Next to the BASIN STATUS panel (resistance rows).
+		p = Vector2(_left_panel.position.x + _left_panel.size.x + 14.0, op.y)
 	else:
 		p = Vector2(_right_panel.position.x - ts.x - 14.0, op.y)
 	p.x = clampf(p.x, 8.0, vs.x - ts.x - 8.0)
@@ -773,7 +1058,31 @@ func _on_action_hover(btn: Button, action_id: String) -> void:
 		if cost.has(res_key):
 			parts.append(str(roundi(float(cost[res_key]))) + " " + I18n.t(RES_KEYS[res_key]))
 	var meta: String = I18n.t("hud.cost_line", {"list": ", ".join(parts)})
+	var idx: int = Balance.ACTION_ORDER.find(action_id)
+	if idx >= 0 and idx < ACTION_HOTKEYS.size():
+		meta += "\n" + I18n.t("hud.key_hint", {"key": str(ACTION_HOTKEYS[idx])})
 	_show_tip(btn, I18n.t(str(def.get("name_key", ""))), I18n.t(str(def.get("desc_key", ""))), meta, "under_panel")
+
+
+func _on_res_hover(block: Control, key: String) -> void:
+	var body: String = I18n.t("hud.rate.tip")
+	if key == "budget" and _budget_negative:
+		body = I18n.t("hud.rate.tip_negative")
+	var meta: String = ""
+	if _rate_values.has(key):
+		meta = I18n.t("hud.rate", {"v": _signed(float(_rate_values[key]))})
+	_show_tip(block, I18n.t(str(RES_KEYS[key])), body, meta, "below")
+
+
+func _on_tree_hover() -> void:
+	_show_tip(_tree_btn, I18n.t("hud.tree.button"), I18n.t("hud.tree.tip"), I18n.t("hud.key_hint", {"key": "T"}), "under_panel")
+
+
+func _on_resist_hover(row: Control, evo_id: String) -> void:
+	var def: Dictionary = TechTree.evolution_def(evo_id)
+	var desc_key: String = str(def.get("desc_key", ""))
+	var body: String = I18n.t(desc_key) if desc_key != "" and I18n.has_key(desc_key) else ""
+	_show_tip(row, _evo_name(evo_id), body, _counter_text(evo_id), "right_of")
 
 
 func _toast_text(text_key: String, args: Dictionary) -> String:
@@ -922,11 +1231,27 @@ func _on_game_started() -> void:
 	_snap = GameState.get_snapshot()
 	_update_time_labels()
 	_select_region(GameState.selected_region)
+	_local_hist.clear()
+	_chart.reset_series()
+	_rate_values.clear()
+	_set_budget_negative(false)
+	_neg_ticks = 0
+	_pos_ticks = 0
+	_neg_warned = false
+	_resist_ids.clear()
+	_refresh_resistances(false)
+	_pressure_branch = ""
+	_update_pressure()
+	_update_tree_status()
 
 
 func _on_tick_done(snapshot: Dictionary) -> void:
 	_snap = snapshot
 	_update_time_labels()
+	_update_chart(snapshot)
+	_update_rates(snapshot)
+	_update_pressure()
+	_update_tree_status()
 	_timeline.set_value(float(snapshot.get("progress", 0.0)))
 	var sh: float = float(snapshot.get("sea_health", 0.0))
 	_sea_bar.set_value(sh)
@@ -945,6 +1270,292 @@ func _update_time_labels() -> void:
 	var left: int = int(_snap.get("years_left", Balance.END_YEAR - Balance.START_YEAR))
 	_year_label.text = I18n.t("hud.year", {"year": str(y)})
 	_years_left_label.text = I18n.t("hud.years_left", {"n": str(left)})
+
+
+# --- Phase 2: live chart, net income, resistances, pressure, policy tree ----------------------
+
+func _update_chart(snap: Dictionary) -> void:
+	if snap.is_empty():
+		return
+	var tick: int = int(snap.get("tick", 0))
+	var sh: float = float(snap.get("sea_health", 0.0))
+	var cr: float = float(snap.get("crisis", 0.0))
+	var need_sample: bool = true
+	if not _local_hist.is_empty():
+		var last: Array = _local_hist[_local_hist.size() - 1]
+		var last_tick: int = int(last[0])
+		if tick < last_tick:
+			_local_hist.clear()
+		elif tick - last_tick < HISTORY_EVERY:
+			need_sample = false
+	if need_sample:
+		_local_hist.append([tick, sh, cr])
+	var hist: Array = GameState.get_history()
+	if hist.is_empty():
+		hist = _local_hist
+	_chart.set_series(hist, tick, sh, cr)
+
+
+static func _ticks_per_year() -> float:
+	return float(Balance.TOTAL_TICKS) / float(maxi(Balance.END_YEAR - Balance.START_YEAR, 1))
+
+
+static func _signed(v: float) -> String:
+	var a: float = absf(v)
+	var body: String = str(roundi(a)) if a >= 9.95 else "%.1f" % a
+	if body == "0" or body == "0.0":
+		return "0"
+	return ("+" if v > 0.0 else "-") + body
+
+
+## Net income per year beside each resource (snapshot *_rate keys; hidden until the
+## simulation provides them). Negative budget income pulses red and warns once.
+func _update_rates(snap: Dictionary, count_ticks: bool = true) -> void:
+	var tpy: float = _ticks_per_year()
+	for k in RES_ORDER:
+		var key: String = k
+		var rl: Label = _rate_labels[key]
+		var sk: String = RATE_KEYS[key]
+		if not snap.has(sk):
+			rl.visible = false
+			_rate_values.erase(key)
+			continue
+		var per_year: float = float(snap[sk]) * tpy
+		_rate_values[key] = per_year
+		rl.visible = true
+		rl.text = I18n.t("hud.rate", {"v": _signed(per_year)})
+		var c: Color = UITheme.TEXT_DIM
+		if per_year >= 0.05:
+			c = UITheme.HEALTHY.lerp(Color.WHITE, 0.2)
+		elif per_year <= -0.05:
+			c = UITheme.CRISIS.lerp(Color.WHITE, 0.15)
+		rl.add_theme_color_override("font_color", c)
+	var neg: bool = _rate_values.has("budget") and float(_rate_values["budget"]) <= -0.05
+	_set_budget_negative(neg)
+	if not count_ticks:
+		return
+	if neg:
+		_neg_ticks += 1
+		_pos_ticks = 0
+		if _neg_ticks >= NEG_INCOME_WARN_TICKS and not _neg_warned and _is_shown:
+			_neg_warned = true
+			EventBus.toast.emit("hud.toast.income_negative", {}, 2)
+	else:
+		_neg_ticks = 0
+		_pos_ticks += 1
+		if _pos_ticks >= NEG_INCOME_REARM_TICKS:
+			_neg_warned = false
+
+
+func _set_budget_negative(on: bool) -> void:
+	if on == _budget_negative:
+		return
+	_budget_negative = on
+	if not on:
+		var bl: Label = _res_labels["budget"]
+		bl.self_modulate = Color.WHITE
+		var rl: Label = _rate_labels["budget"]
+		rl.self_modulate = Color.WHITE
+		var ic: Icons = _res_icons["budget"]
+		ic.self_modulate = Color.WHITE
+
+
+func _evo_name(evo_id: String) -> String:
+	var def: Dictionary = TechTree.evolution_def(evo_id)
+	var nk: String = str(def.get("name_key", ""))
+	if nk != "":
+		return I18n.t(nk)
+	return evo_id
+
+
+## "Countered by: A, B, C" from the policy nodes that list this evolution in "counters".
+func _counter_text(evo_id: String) -> String:
+	var names := PackedStringArray()
+	for n in TechTree.counters_of(evo_id):
+		var node_def: Dictionary = TechTree.node_def(str(n))
+		var nk: String = str(node_def.get("name_key", ""))
+		if nk == "":
+			continue
+		if names.size() >= MAX_RESIST_COUNTERS:
+			names.append("…")
+			break
+		names.append(I18n.t(nk))
+	if names.is_empty():
+		return I18n.t("hud.resist.counter_unknown")
+	return I18n.t("hud.resist.counter", {"list": ", ".join(names)})
+
+
+## Rebuilds the resistance rows from GameState.active_evolutions(); animate marks new ones.
+## Shows the newest MAX_RESIST_ROWS, then an "Also active: N" line for the rest.
+func _refresh_resistances(animate: bool) -> void:
+	if _resist_list == null:
+		return
+	var ids: Array = GameState.active_evolutions()
+	for child in _resist_list.get_children():
+		var c: Node = child
+		if c != _resist_none and c != _resist_more:
+			_resist_list.remove_child(c)
+			c.queue_free()
+	_resist_none.visible = ids.is_empty()
+	var first: int = maxi(0, ids.size() - MAX_RESIST_ROWS)
+	for i in range(ids.size() - 1, first - 1, -1):
+		var evo_id: String = str(ids[i])
+		var fresh: bool = animate and not _resist_ids.has(evo_id)
+		_build_resist_row(evo_id, fresh)
+	_resist_more.visible = first > 0
+	if first > 0:
+		_resist_more.text = I18n.t("hud.resist.more", {"n": str(first)})
+	_resist_list.move_child(_resist_more, _resist_list.get_child_count() - 1)
+	_resist_ids = ids.duplicate()
+	_resist_count.text = str(ids.size())
+	var bc: Color = UITheme.CRISIS if not ids.is_empty() else UITheme.TEXT_DIM
+	_resist_badge.add_theme_stylebox_override("panel", UITheme.badge_box(bc))
+	_resist_count.add_theme_color_override("font_color", bc.lerp(Color.WHITE, 0.3))
+	call_deferred("_shrink_panels")
+
+
+func _build_resist_row(evo_id: String, fresh: bool) -> void:
+	var def: Dictionary = TechTree.evolution_def(evo_id)
+	var panel := PanelContainer.new()
+	panel.mouse_filter = Control.MOUSE_FILTER_STOP
+	panel.add_theme_stylebox_override("panel", UITheme.stripe_box(UITheme.CRISIS, 0.7))
+	panel.mouse_entered.connect(_on_resist_hover.bind(panel, evo_id))
+	panel.mouse_exited.connect(_hide_tip.bind(panel))
+	_resist_list.add_child(panel)
+	var row := _hbox(10)
+	panel.add_child(row)
+	var icon_id: String = str(def.get("icon", ""))
+	if not Icons.IDS.has(icon_id):
+		icon_id = _icon_or("evolution", "crisis")
+	row.add_child(_icon(icon_id, UITheme.CRISIS.lerp(Color.WHITE, 0.15), 24.0))
+	var txt := _vbox(1)
+	txt.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	row.add_child(txt)
+	var name_l := _label("SmallLabel")
+	name_l.add_theme_font_override("font", UITheme.mono_bold_font())
+	name_l.add_theme_color_override("font_color", UITheme.CRISIS.lerp(Color.WHITE, 0.45))
+	name_l.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	name_l.custom_minimum_size = Vector2(200.0, 0.0)
+	name_l.text = _evo_name(evo_id)
+	txt.add_child(name_l)
+	var hint := _label("DimLabel")
+	hint.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	hint.custom_minimum_size = Vector2(200.0, 0.0)
+	hint.text = _counter_text(evo_id)
+	txt.add_child(hint)
+	if fresh:
+		panel.modulate = Color(2.2, 1.4, 1.4, 0.0)
+		var tw := panel.create_tween()
+		tw.set_trans(Tween.TRANS_CUBIC)
+		tw.set_ease(Tween.EASE_OUT)
+		tw.tween_property(panel, "modulate", Color(1.6, 1.0, 1.0, 1.0), 0.25)
+		tw.tween_property(panel, "modulate", Color.WHITE, 0.8)
+
+
+func _branch_evolution_active(branch: String, active: Array) -> bool:
+	for e in TechTree.all_evolutions():
+		var def: Dictionary = e
+		if str(def.get("trigger", "")) == "branch" and str(def.get("branch", "")) == branch and active.has(str(def.get("id", ""))):
+			return true
+	return false
+
+
+func _branch_name(branch: String) -> String:
+	var key: String = "hud.branch." + branch
+	if I18n.has_key(key):
+		return I18n.t(key)
+	var info: Dictionary = TechTree.BRANCH_INFO.get(branch, {})
+	return I18n.t(str(info.get("name_key", key)))
+
+
+## Warns before a one-sided strategy provokes a resistance (GameState.evolution_pressure()).
+func _update_pressure() -> void:
+	if _pressure_box == null:
+		return
+	var p: Dictionary = GameState.evolution_pressure()
+	var shares: Dictionary = p.get("shares", {})
+	var threshold: float = float(p.get("threshold", 1.0))
+	var moves: int = int(p.get("moves", 0))
+	var min_moves: int = int(p.get("min_moves", 1))
+	var active: Array = GameState.active_evolutions()
+	var best_branch: String = ""
+	var best: float = 0.0
+	for b in shares.keys():
+		var branch: String = str(b)
+		var share: float = float(shares[b])
+		if _branch_evolution_active(branch, active):
+			continue
+		if share > best:
+			best = share
+			best_branch = branch
+	var need_moves: int = maxi(2, int(ceilf(float(min_moves) * 0.6)))
+	var want: bool = GameState.running and best_branch != "" and threshold > 0.0 \
+		and moves >= need_moves and best >= threshold * 0.8
+	if want:
+		_pressure_label.text = I18n.t("hud.pressure.warn", {"branch": _branch_name(best_branch)})
+		_pressure_bar.markers = [threshold * 100.0]
+		_pressure_bar.set_value(best * 100.0)
+		_pressure_bar.alert = best >= threshold
+	if want != _pressure_box.visible:
+		_pressure_box.visible = want
+		if want:
+			_pressure_box.modulate = Color(1.8, 1.6, 1.0, 0.0)
+			var tw := _pressure_box.create_tween()
+			tw.tween_property(_pressure_box, "modulate", Color.WHITE, 0.5)
+		call_deferred("_shrink_panels")
+	_pressure_branch = best_branch if want else ""
+
+
+func _count_adoptable() -> int:
+	var n: int = 0
+	for nd in TechTree.all_nodes():
+		var def: Dictionary = nd
+		if GameState.can_adopt(str(def.get("id", ""))):
+			n += 1
+	return n
+
+
+func _update_tree_status() -> void:
+	if _tree_status == null:
+		return
+	_adoptable = _count_adoptable() if GameState.running else 0
+	if _adoptable > 0:
+		_tree_status.text = I18n.t("hud.tree.available", {"n": str(_adoptable)})
+		_tree_status.add_theme_color_override("font_color", UITheme.HEALTHY.lerp(Color.WHITE, 0.2))
+	else:
+		_tree_status.text = I18n.t("hud.tree.none")
+		_tree_status.add_theme_color_override("font_color", UITheme.TEXT_DIM)
+
+
+func _on_tree_pressed() -> void:
+	_hide_tip_now()
+	EventBus.tree_toggle_requested.emit()
+	# main.gd may refuse (event card open): keep the button in step with the real state.
+	_tree_btn.set_pressed_no_signal(_tree_open)
+
+
+func _on_tree_toggled(is_open: bool) -> void:
+	_tree_open = is_open
+	_tree_btn.set_pressed_no_signal(is_open)
+	_hide_tip_now()
+	if not is_open:
+		_update_tree_status()
+
+
+func _on_node_adopted(_node_id: String) -> void:
+	_update_tree_status()
+	_update_pressure()
+
+
+func _on_evolution_happened(_evolution_id: String) -> void:
+	_refresh_resistances(true)
+	_update_pressure()
+	_resist_flash = 1.0
+
+
+func _on_evolution_cured(_evolution_id: String) -> void:
+	_refresh_resistances(false)
+	_update_pressure()
 
 
 func _on_resources_changed(budget: float, political: float, science: float) -> void:
@@ -1077,6 +1688,9 @@ func _refresh_actions() -> void:
 			if btn.disabled:
 				UITheme.reset_fx(btn)
 		ic.color = UITheme.HEALTHY if can else UITheme.with_alpha(UITheme.TEXT_DIM, 0.55)
+		var cap: PanelContainer = row["keycap"]
+		if cap != null:
+			cap.modulate.a = 1.0 if can else 0.4
 		cd_fill.anchor_right = clampf(cd_frac, 0.0, 1.0)
 		var cost: Dictionary = GameState.action_cost(id)
 		var cost_labels: Dictionary = row["cost"]
@@ -1152,6 +1766,10 @@ func _on_language_changed(_lang: String) -> void:
 		var tl: Label = t["label"]
 		if is_instance_valid(tl):
 			tl.text = _toast_text(str(t["key"]), t["args"])
+	_update_rates(_snap, false)
+	_refresh_resistances(false)
+	_update_pressure()
+	_update_tree_status()
 	_hide_tip_now()
 	call_deferred("_shrink_panels")
 
@@ -1187,3 +1805,34 @@ func _process(delta: float) -> void:
 		_badge.modulate.a = 1.0
 	if _tip_panel.visible:
 		_place_tip()
+	_guard_toasts()
+	_process_phase2(delta)
+
+
+## Death-spiral pulse on the budget, attention pulses for resistances, pressure and the tree.
+func _process_phase2(delta: float) -> void:
+	var wave: float = 0.5 + 0.5 * sin(_time * 6.5)
+	if _budget_negative:
+		var hot := Color(1.0, 0.42, 0.38, 1.0)
+		var bl: Label = _res_labels["budget"]
+		bl.self_modulate = Color.WHITE.lerp(hot, 0.35 + 0.65 * wave)
+		var rl: Label = _rate_labels["budget"]
+		rl.self_modulate = Color(1.0, 1.0, 1.0, 0.55 + 0.45 * wave)
+		var ic: Icons = _res_icons["budget"]
+		ic.self_modulate = Color.WHITE.lerp(Color(1.6, 0.45, 0.4, 1.0), wave)
+	if _resist_flash > 0.0:
+		_resist_flash = maxf(0.0, _resist_flash - delta * 0.6)
+		var f: float = _resist_flash * (0.5 + 0.5 * sin(_time * 14.0))
+		_resist_title.self_modulate = Color.WHITE.lerp(Color(1.6, 0.5, 0.45, 1.0), f)
+		_resist_icon.scale = Vector2.ONE * (1.0 + 0.3 * f)
+		_resist_icon.pivot_offset = _resist_icon.size * 0.5
+	else:
+		_resist_title.self_modulate = Color.WHITE
+		_resist_icon.scale = Vector2.ONE
+	if _pressure_box.visible:
+		_pressure_icon.self_modulate = Color(1.0, 1.0, 1.0, 0.45 + 0.55 * wave)
+	if _adoptable > 0 and not _tree_open:
+		var glow: float = 0.5 + 0.5 * sin(_time * 3.2)
+		_tree_icon.self_modulate = Color.WHITE.lerp(Color(1.5, 1.35, 1.0, 1.0), glow)
+	else:
+		_tree_icon.self_modulate = Color.WHITE
