@@ -149,7 +149,7 @@ void fragment() {
 		float film = fbm(p * 0.55 + vec2(t * 0.02, t * 0.015));
 		float slick = smoothstep(0.42, 0.6, film) * clamp(pollution * 0.9 + sick * 0.45 - 0.2, 0.0, 1.0);
 		vec3 irid = 0.5 + 0.5 * cos(6.2831 * (film * 3.0 + vec3(0.0, 0.33, 0.67)));
-		vec3 oil = irid * 0.045 + vec3(0.014, 0.007, 0.006);
+		vec3 oil = irid * vec3(0.03, 0.018, 0.03) + vec3(0.016, 0.007, 0.006);
 
 		// toxic veins pulsing through sick water
 		float vn = fbm(p * 0.7 - vec2(t * 0.03, -t * 0.01));
@@ -188,12 +188,11 @@ void fragment() {
 		em = em * (1.0 + highlight * 0.55) + scol * highlight * 0.035;
 		em += accent_color * (sel_ring * 1.1 + selected * 0.025);
 		em += pulse_color * pulse_ring * 1.8;
-		em = mix(em, mix(crisis_color, vec3(1.0), 0.3) * 1.8, flash * 0.6);
-
-		ALBEDO = water * 0.12;
+		em = mix(em, crisis_color * 1.15, flash * 0.9);
+		ALBEDO = mix(water * 0.12, vec3(0.0), flash);
 		EMISSION = em;
-		ROUGHNESS = clamp(mix(0.5, 0.2, vh) - slick * 0.15, 0.05, 1.0);
-		SPECULAR = mix(0.05, 0.3, vh);
+		ROUGHNESS = clamp(mix(0.5, 0.28, vh) - slick * 0.15, 0.05, 1.0);
+		SPECULAR = mix(0.05, 0.2, vh);
 		METALLIC = 0.0;
 	} else if (v_part < 1.5) {
 		// ---------------- glowing rim band ----------------
