@@ -110,6 +110,8 @@ const STRINGS := {
 	# --- HUD: field operations ---
 	"hud.actions_title": {"tr": "SAHA OPERASYONLARI", "en": "FIELD OPERATIONS", "ru": "ПОЛЕВЫЕ ОПЕРАЦИИ"},
 	"hud.cost": {"tr": "Maliyet", "en": "Cost", "ru": "Стоимость"},
+	"hud.cost_line": {"tr": "Maliyet: {list}", "en": "Cost: {list}", "ru": "Стоимость: {list}"},
+	"hud.action.unavailable": {"tr": "Kullanılamaz", "en": "Unavailable", "ru": "Недоступно"},
 	"hud.action.ready": {"tr": "Hazır", "en": "Ready", "ru": "Готово"},
 	"hud.action.cooldown": {"tr": "Hazırlanıyor: {n} sn", "en": "Ready in: {n} s", "ru": "Готово через: {n} с"},
 	"hud.action.no_funds": {"tr": "Yetersiz kaynak", "en": "Not enough resources", "ru": "Не хватает ресурсов"},

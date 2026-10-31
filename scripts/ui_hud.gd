@@ -182,9 +182,10 @@ func _sep() -> HSeparator:
 	return s
 
 
+## Trims overlong single-line text with an ellipsis. No clip_text: clipping to the line box
+## cuts the marks above capitals (Turkish İ/Ö/Ü/Ğ, Russian Ё), which changes the letter.
 func _ellipsis(l: Label) -> void:
 	l.text_overrun_behavior = TextServer.OVERRUN_TRIM_ELLIPSIS
-	l.clip_text = true
 	l.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 
 
@@ -251,7 +252,7 @@ func _build_top_bar() -> void:
 
 	# Brand: ECG pulse + title.
 	var brand := _hbox(10)
-	brand.custom_minimum_size = Vector2(280.0, 0.0)
+	brand.custom_minimum_size = Vector2(400.0, 0.0)
 	row.add_child(brand)
 	_pulse = Charts.new()
 	_pulse.setup_pulse(Vector2(84.0, 36.0))
@@ -765,7 +766,7 @@ func _on_action_hover(btn: Button, action_id: String) -> void:
 		var res_key: String = ck
 		if cost.has(res_key):
 			parts.append(str(roundi(float(cost[res_key]))) + " " + I18n.t(RES_KEYS[res_key]))
-	var meta: String = I18n.t("hud.cost") + ": " + ", ".join(parts)
+	var meta: String = I18n.t("hud.cost_line", {"list": ", ".join(parts)})
 	_show_tip(btn, I18n.t(str(def.get("name_key", ""))), I18n.t(str(def.get("desc_key", ""))), meta, "left")
 
 
@@ -1057,7 +1058,7 @@ func _refresh_actions() -> void:
 			key = "hud.action.no_funds"
 			scol = UITheme.CRISIS
 		elif not can:
-			key = "hud.action.select_region"
+			key = "hud.action.unavailable"
 			scol = UITheme.TEXT_DIM
 		status_l.text = I18n.t(key, args)
 		status_l.add_theme_color_override("font_color", scol)

@@ -80,7 +80,7 @@ signal evolution_happened(evolution_id: String)                   # Phase 2
 
 **Toast args convention:** values that are i18n keys (e.g. region name keys `"region.levant.name"`) are translated by the displayer: for each arg value `v` that is a String with `I18n.has_key(v)`, use `I18n.t(v)`; numbers are pre-formatted strings. Severity 3 also makes the map shake.
 
-**Snapshot** (`GameState.get_snapshot()`, `tick_done`): `tick:int, year:float, year_int:int, years_left:int, progress:float(0-1), temperature:float(°C above pre-industrial, 1.5→4.0), sea_health:float(0-100), crisis:float(0-100 avg), awareness:float(0-100 avg), budget:float, political:float, science:float, actions_used:int, speed_index:int`.
+**Snapshot** (`GameState.get_snapshot()`, `tick_done`): `tick:int, year:float, year_int:int, years_left:int, progress:float(0-1), temperature:float(°C above pre-industrial, 1.5→4.0), sea_health:float(0-100), crisis:float(0-100 avg), awareness:float(0-100 avg), budget:float, political:float, science:float, actions_used:int, spreads:int, speed_index:int`.
 
 **Region dictionary** (`region_changed`, `GameState.get_region(id)`): `id, name_key, pollution, coral_health, seagrass, fish_stock, awareness, protection, coastal_pop (0-1 weight), crisis (0-100), health (0-100), status ("healthy"|"stressed"|"critical"|"collapsed")`.
 
@@ -119,6 +119,7 @@ Main menu (map in menu mode behind a dark overlay) → *New Game* → `GameState
 - Toasts for regions crossing `REGION_CRITICAL_CRISIS` (severity 3) and recovering below `REGION_RECOVERED_CRISIS` (severity 1), low resources (severity 2). Rate-limit: no more than ~1 toast per 3 ticks per kind.
 - Win: any tick all regions crisis < 25 → `win_crisis`; at the final tick sea health ≥ 60 → `win_health`, otherwise `lose_time`. Lose any tick: temperature ≥ 4.0, sea health < 10, budget and political both < `DEPLETED_THRESHOLD`.
 - Actions (`Balance.ACTIONS`): cleanup (budget → pollution −14), patrol (political → protection +22), campaign (budget+political → awareness +18 here, ×0.35 to route neighbours). Per (action, region) cooldown in ticks. Track `branch_usage[branch] += 1` (Phase 2 evolution input).
+- Refinements in the implementation: protection/awareness pollution reduction scales with pollution / 50 (regions settle instead of running to 0/100); cleanup removes `15 × clamp(pollution / 50, 0.6, 1.4)`; patrol/campaign gains shrink as protection/awareness fill up; `lose_resources` needs both resources depleted for `DEPLETED_GRACE_TICKS` (15) consecutive ticks; loses are checked before wins on the same tick; spread rolls once per route per tick from the sicker to the healthier end.
 - Balance targets: full game 8–12 min at 1x; do-nothing loses (temperature or health) around 2040–2045; spamming one action type does not win; balanced play (an action every ~6–10 s at 1x, spread across regions) wins with sea health ≈ 60–70% in 2046. First 3 minutes dramatic: visible spreads within the first ~20 s and a critical-region alarm within ~60 s.
 - `scripts/sim_test.gd` (`extends SceneTree`, run `"$G" --headless --path . -s res://scripts/sim_test.gd`): 1000 ticks × 3 scripted strategies (do-nothing, spam-one-branch, balanced) on fixed seeds; prints a table of outcome, reason, end year, sea health, temperature. It must not touch autoloads (they are absent in `-s` mode).
 
