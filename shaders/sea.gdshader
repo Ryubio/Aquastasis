@@ -22,6 +22,10 @@ uniform vec3 crisis_color : source_color = vec3(1.0, 0.231, 0.188);
 uniform vec3 warning_color : source_color = vec3(1.0, 0.784, 0.239);
 uniform vec3 accent_color : source_color = vec3(0.91, 0.639, 0.239);
 uniform vec3 pulse_color : source_color = vec3(0.098, 0.902, 0.757);
+// Ground footprint of the region's name/status labels (map_builder.gd _measure_labels):
+// selection rings stay out from under the text so the name remains readable.
+uniform vec2 label_center = vec2(0.0, 0.0);
+uniform vec2 label_half = vec2(0.0, 0.0);
 
 varying vec3 wpos;
 varying float v_part;
@@ -55,9 +59,10 @@ float fbm(vec2 p) {
 	return v;
 }
 
-// Remaps raw health so the typical 0.3..0.8 game range spans the whole visual range.
+// Remaps raw health so only genuinely healthy water (crisis < 30) reaches full turquoise;
+// stressed water (crisis 30-55) sits mid-range. map_builder.gd uses the same remap.
 float vis_health() {
-	return smoothstep(0.28, 0.78, health);
+	return smoothstep(0.28, 0.82, health);
 }
 
 float wave_amp(float vh) {
@@ -94,6 +99,12 @@ void fragment() {
 	// Selection: thin rings drifting outward from the anchor. Action pulse: one expanding ring.
 	float sel_w = fract(r * 0.22 - t * 0.35);
 	float sel_ring = smoothstep(0.0, 0.03, sel_w) * (1.0 - smoothstep(0.03, 0.16, sel_w)) * selected;
+	vec2 ld = abs(p - label_center);
+	float under_label = (1.0 - smoothstep(label_half.x, label_half.x + 0.35, ld.x))
+		* (1.0 - smoothstep(label_half.y, label_half.y + 0.35, ld.y));
+	sel_ring *= 1.0 - under_label;
+	// Spread hit: a red shock ring expanding from the anchor while the flash decays.
+	float flash_ring = exp(-abs(r - (1.0 - flash) * 9.0) * 1.6) * flash;
 	float pulse_rad = (1.0 - pulse) * 10.0;
 	float pulse_ring = exp(-abs(r - pulse_rad) * 2.5) * pulse;
 
@@ -127,6 +138,10 @@ void fragment() {
 		vec3 s_deep = vec3(0.026, 0.009, 0.011);
 		vec3 water_s = mix(mix(s_mid, s_deep, deep), s_shallow, shallow);
 		vec3 water = mix(water_s, water_h, vh);
+		// stressed mid-range: murky amber-green instead of clean turquoise
+		float mid = 1.0 - abs(vh * 2.0 - 1.0);
+		vec3 murk = warning_color * 0.16 + vec3(0.015, 0.035, 0.01);
+		water = mix(water, murk, mid * 0.45);
 
 		// caustic lines (healthy), strongest in the shallows
 		vec2 q = p * 1.05;
@@ -188,8 +203,11 @@ void fragment() {
 		em = em * (1.0 + highlight * 0.55) + scol * highlight * 0.035;
 		em += accent_color * (sel_ring * 1.1 + selected * 0.025);
 		em += pulse_color * pulse_ring * 1.8;
-		em = mix(em, crisis_color * 1.15, flash * 0.9);
-		ALBEDO = mix(water * 0.12, vec3(0.0), flash);
+		// spread hit: tint the water red but keep its texture (a flat bright fill blooms
+		// into pale salmon), plus the expanding shock ring
+		em = mix(em, em * vec3(1.25, 0.28, 0.22) + crisis_color * 0.2, flash * 0.8);
+		em += crisis_color * flash_ring * 1.5;
+		ALBEDO = water * 0.12 * (1.0 - flash * 0.6);
 		EMISSION = em;
 		ROUGHNESS = clamp(mix(0.5, 0.28, vh) - slick * 0.15, 0.05, 1.0);
 		SPECULAR = mix(0.05, 0.2, vh);
@@ -201,7 +219,7 @@ void fragment() {
 		float across = 1.0 - v_extra * 0.65;
 		vec3 rim = scol * (1.0 + highlight * 1.6) * run * across;
 		rim = mix(rim, accent_color * 2.6 * across, selected);
-		rim += mix(crisis_color, vec3(1.0), 0.4) * flash * 2.4;
+		rim += crisis_color * flash * 2.2;
 		rim += pulse_color * pulse * 1.5;
 		ALBEDO = vec3(0.0);
 		EMISSION = rim;

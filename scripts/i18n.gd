@@ -38,7 +38,7 @@ const STRINGS := {
 	"ui.menu.briefing": {
 		"tr": "Deniz Sağlığı Krizini tüm Akdeniz'e yayılmadan durdur. 2046'ya kadar Deniz Sağlığı Endeksini %60'a çıkar ya da her bölgedeki krizi %25'in altına indir. Isınma +4.0°C'ye ulaşırsa, Deniz Sağlığı %10'un altına düşerse ya da bütçe ve siyasi destek birlikte tükenirse kaybedersin.",
 		"en": "Stop the Marine Health Crisis before it spreads across the Mediterranean. Reach a Sea Health Index of 60% by 2046, or push every region's crisis below 25%. You lose if warming hits +4.0°C, Sea Health falls under 10%, or both budget and political support run out.",
-		"ru": "Остановите кризис здоровья моря, пока он не охватил всё Средиземноморье. Доведите индекс здоровья моря до 60% к 2046 году или снизьте кризис в каждом регионе ниже 25%. Поражение: потепление до +4.0°C, здоровье моря ниже 10% или одновременная потеря бюджета и политической поддержки.",
+		"ru": "Остановите экологический кризис, пока он не охватил всё Средиземноморье. Доведите индекс здоровья моря до 60% к 2046 году или снизьте уровень кризиса во всех регионах ниже 25%. Поражение: потепление до +4.0°C, здоровье моря ниже 10% или потеря и бюджета, и политической поддержки.",
 	},
 	"ui.menu.start": {"tr": "Yeni Oyun", "en": "New Game", "ru": "Новая игра"},
 	"ui.menu.language": {"tr": "Dil", "en": "Language", "ru": "Язык"},
@@ -102,7 +102,7 @@ const STRINGS := {
 	"hud.region.coastal_pop": {
 		"tr": "Kıyı Nüfusu Baskısı",
 		"en": "Coastal Population Pressure",
-		"ru": "Давление прибрежного населения",
+		"ru": "Антропогенная нагрузка",
 	},
 	# Status words are gender-neutral in Russian (they label regions of any gender).
 	"hud.status.healthy": {"tr": "SAĞLIKLI", "en": "HEALTHY", "ru": "В НОРМЕ"},
@@ -210,7 +210,7 @@ const STRINGS := {
 	"end.win.crisis.text": {
 		"tr": "Tüm bölgeler kriz eşiğinin altında. Tersine pandemi kontrol altına alındı.",
 		"en": "Every region is below the crisis threshold. The reverse pandemic is contained.",
-		"ru": "Кризис во всех регионах ниже порога. Морская пандемия остановлена.",
+		"ru": "Уровень кризиса во всех регионах ниже порога. Морская пандемия остановлена.",
 	},
 	"end.lose.temperature.title": {"tr": "KIRILMA NOKTASI", "en": "TIPPING POINT", "ru": "ТОЧКА НЕВОЗВРАТА"},
 	"end.lose.temperature.text": {

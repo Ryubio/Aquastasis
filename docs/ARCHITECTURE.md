@@ -55,6 +55,8 @@ cd "/c/Users/HARUN BERKE ÖZTÜRK/OneDrive/Masaüstü/Cop31 Game"
 # render real frames (shaders only compile with a GPU; opens a window briefly).
 # Writes shots/frame00000000.png ... ; view a frame with the Read tool.
 "$G" --path . --resolution 1920x1080 --write-movie shots/frame.png --fixed-fps 30 --quit-after 90 -- --autostart --speed=3 --select=antalya
+# single screenshots at chosen frames (much lighter than --write-movie); args after -- also reach main.gd
+"$G" --path . --resolution 1920x1080 --fixed-fps 30 res://tools/shot.tscn -- --autostart --speed=3 --select=antalya --shot=300:shots/game.png
 ```
 `--check-only -s` does NOT work for scripts that use autoloads; use `tools/check.tscn`. Headless runs do not compile shaders: render real frames to see shader errors (they print to stdout) and to look at the result. Put screenshots under `shots/` (git-ignored) and delete what you don't need. Any `SCRIPT ERROR`, `Parse Error`, `ERROR:` or shader compile error in the output is a failure.
 

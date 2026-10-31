@@ -1195,7 +1195,7 @@ func _update_regions(delta: float) -> void:
 		rv.selected = lerpf(rv.selected, sel_goal, kh)
 		rv.flash = maxf(rv.flash - delta * 1.3, 0.0)
 		rv.pulse = maxf(rv.pulse - delta / 1.5, 0.0)
-		var vis: float = smoothstep(0.25, 0.92, rv.health)  # same remap as vis_health() in sea.gdshader
+		var vis: float = smoothstep(0.28, 0.82, rv.health)  # same remap as vis_health() in sea.gdshader
 		rv.wave_phase += delta * lerpf(0.3, 1.0, vis)
 		var mat: ShaderMaterial = rv.mat
 		mat.set_shader_parameter("health", rv.health)
