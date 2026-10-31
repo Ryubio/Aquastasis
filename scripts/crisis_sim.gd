@@ -519,3 +519,78 @@ func _push_toast(toasts: Array, kind: String, key: String, args: Dictionary, sev
 	_toast_last[kind] = tick
 	toasts.append([key, args, severity])
 	return true
+
+
+# =====================================================================================
+# Phase 2 API (STUBS: frozen signatures, see docs/ARCHITECTURE.md "Phase 2"). The simulation
+# module replaces these bodies with the policy tree, evolution, events and bubbles engine.
+# =====================================================================================
+
+var pending_event: Dictionary = {}   # {"id": String, "region": String} while a card waits
+var history: Array = []              # [[tick, sea_health, crisis], ...]
+
+
+## Field operation cost with running modifiers applied.
+func action_cost(action_id: String) -> Dictionary:
+	if not B.ACTIONS.has(action_id):
+		return {}
+	var def: Dictionary = B.ACTIONS[action_id]
+	var cost: Dictionary = def["cost"]
+	return cost.duplicate()
+
+
+func node_state(_node_id: String) -> String:
+	return "locked"
+
+
+func node_ramp(_node_id: String) -> float:
+	return 0.0
+
+
+func node_cost(_node_id: String) -> Dictionary:
+	return {}
+
+
+func can_adopt(_node_id: String) -> bool:
+	return false
+
+
+## Returns {"ok": bool, "toasts": [...], "news": [...], "evolutions": [...], "cured": [...]}
+func adopt(_node_id: String) -> Dictionary:
+	return {"ok": false}
+
+
+func adopted_nodes() -> Array:
+	return []
+
+
+func active_evolutions() -> Array:
+	return []
+
+
+func evolution_pressure() -> Dictionary:
+	return {"shares": {}, "threshold": 1.0, "moves": 0, "min_moves": 1}
+
+
+func can_choose(_choice_index: int) -> bool:
+	return false
+
+
+## Returns {"ok": bool, "toasts": [...], "news": [...], "evolutions": [...], "cured": [...]}
+func resolve_event(_choice_index: int) -> Dictionary:
+	return {"ok": false}
+
+
+func active_bubbles() -> Array:
+	return []
+
+
+## Returns {"ok": bool, "kind": String, "amount": float}
+func collect_bubble(_bubble_id: int) -> Dictionary:
+	return {"ok": false}
+
+
+## Dev / demo hook: makes event_id the pending card now (region by its region_rule).
+## Returns the new pending_event, or {} if the id is unknown or a card is already waiting.
+func force_event(_event_id: String) -> Dictionary:
+	return {}

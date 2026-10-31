@@ -244,20 +244,50 @@ const STRINGS := {
 	"end.main_menu": {"tr": "Ana Menü", "en": "Main Menu", "ru": "Главное меню"},
 }
 
+## Phase 2 string tables, one per content domain so modules can be written and translated in
+## parallel. Each file holds `const STRINGS := {key: {"tr", "en", "ru"}}`; lookups still go
+## through this autoload only. Keys must be unique across all tables.
+const TABLES := [
+	preload("res://scripts/i18n_tree.gd"),     # policy tree nodes, branches, evolutions
+	preload("res://scripts/i18n_events.gd"),   # decision event cards
+	preload("res://scripts/i18n_sim.gd"),      # simulation toasts and news headlines
+	preload("res://scripts/i18n_ui_tree.gd"),  # tree modal and event card chrome
+	preload("res://scripts/i18n_hud.gd"),      # HUD additions, news ticker, bubbles
+]
+
 var lang: String = FALLBACK
 var _warned: Dictionary = {}
+var _all: Dictionary = {}   # STRINGS merged with every table in TABLES
 
 
 func _ready() -> void:
 	lang = _load_saved_language()
+	_ensure_tables()
+
+
+## Merges the domain tables into _all once (also on first lookup, in case another autoload
+## asks for text before this one is ready).
+func _ensure_tables() -> void:
+	if not _all.is_empty():
+		return
+	_all = STRINGS.duplicate()
+	for t_script in TABLES:
+		var table: GDScript = t_script
+		var consts: Dictionary = table.get_script_constant_map()
+		var strings: Dictionary = consts.get("STRINGS", {})
+		for k in strings:
+			if _all.has(k):
+				push_warning("I18n: duplicate key '%s' in %s" % [str(k), table.resource_path])
+			_all[k] = strings[k]
 
 
 ## Translated text for key in the current language, with {name} placeholders filled from
 ## args. Falls back to English, then to the key itself (and warns once).
 func t(key: String, args: Dictionary = {}) -> String:
+	_ensure_tables()
 	var text: String = key
-	if STRINGS.has(key):
-		var entry: Dictionary = STRINGS[key]
+	if _all.has(key):
+		var entry: Dictionary = _all[key]
 		if entry.has(lang):
 			text = entry[lang]
 		elif entry.has(FALLBACK):
@@ -271,7 +301,8 @@ func t(key: String, args: Dictionary = {}) -> String:
 
 
 func has_key(key: String) -> bool:
-	return STRINGS.has(key)
+	_ensure_tables()
+	return _all.has(key)
 
 
 ## Native display name of a language code ("Türkçe", "English", "Русский").

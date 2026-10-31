@@ -150,3 +150,93 @@ Main menu (map in menu mode behind a dark overlay) → *New Game* → `GameState
 ## 10. Localization
 
 `i18n.gd` holds every key with `en` text; the localization module completes `tr` and `ru` for all keys (natural, concise game UI language; Turkish uppercase variants spelled correctly: İ/I, e.g. "AKDENİZ'İN NABZI"). If you add a key in your module, report it with its English text; the localization pass adds it to `i18n.gd`.
+
+## 11. Phase 2 contract (policy tree, crisis evolution, decision events, data bubbles, news, live chart)
+
+Phase 2 scope (README "DELIVERY IN PHASES"): policy tree modal (4 branches, connected nodes), crisis evolution, data bubbles, news ticker, live chart, 10+ event cards, tooltips with real-world facts, all translated. Teammate ideas from `Fikr` that are in scope are folded in below (mucilage / tourism / trawler cards, COP31 summits in 2031/2036/2041, Q/W/E hotkeys, blue-carbon income, negative-income warning).
+
+### 11.1 Modules and file ownership
+
+| Module | Owns | Starts |
+|---|---|---|
+| content | `scripts/tech_tree.gd` (NODES, EVOLUTIONS), `scripts/events.gd` (EVENTS), `scripts/i18n_tree.gd`, `scripts/i18n_events.gd` (English) | first |
+| simulation | `scripts/crisis_sim.gd`, `scripts/balance.gd`, `scripts/sim_test.gd`, `scripts/i18n_sim.gd`; internals of `scripts/game_state.gd` (public API frozen). After content finishes it may also tune values and the matching English text in the four content files | after content |
+| tree UI | `scripts/ui_tree.gd`, `scripts/ui_event_card.gd`, `scripts/icons.gd`, `scripts/i18n_ui_tree.gd` | after content |
+| HUD | `scripts/ui_hud.gd`, `scripts/news_ticker.gd`, `scripts/fx.gd`, `scripts/charts.gd`, `scripts/ui_theme.gd` (append only; PALETTE frozen), `scripts/i18n_hud.gd` | first |
+| integration | `main.gd`, `event_bus.gd`, `i18n.gd`, `region.gd`, `map_builder.gd`, shaders, docs | - |
+
+Already written and frozen: EventBus signals (section 4 plus the Phase 2 block in `event_bus.gd`); the GameState Phase 2 API in `scripts/game_state.gd` (pause reasons; `node_state/node_ramp/node_cost/can_adopt/adopt_node/adopted_nodes`; `active_evolutions/evolution_pressure`; `current_event/can_choose/resolve_event/debug_force_event`; `active_bubbles/collect_bubble`; `get_history`); CrisisSim Phase 2 stubs (end of `crisis_sim.gd`, incl. `force_event`); the API stubs of `ui_tree.gd` (`open/close/toggle/is_open`), `ui_event_card.gd` (`is_open/close_now`), `fx.gd` (`map`, `clear_all`), `news_ticker.gd` (`clear`); and `main.gd` wiring: CanvasLayers FX 1, HUD 2, tree 3, event card 4, menu 5; hotkeys T (tree), Q/W/E (field operations on the selected region), Esc closes the tree first; user args `--tree` and `--event=<id>` (dev/screenshot hooks).
+
+Modal pause: the tree calls `GameState.set_pause_reason("tree", on)`; an event card is paused by GameState itself (`"event"`) until `resolve_event()`. While a card waits, field operations and adoptions are refused.
+
+### 11.2 Effect vocabulary (nodes, evolutions, event choices)
+
+Each effect is a Dictionary:
+- `{"op": "mul", "key": <MUL key>, "value": 0.8}` - persistent multiplier (1.0 = no change) while the node is adopted (scaled by its ramp: `1 + (value - 1) * ramp`), while the evolution is active, or for `"ticks": N` after an event choice.
+- `{"op": "add", "key": <ADD key>, "value": 0.05}` - persistent additive term, same lifetime rules.
+- `{"op": "region", "stat": "pollution" | "coral_health" | "seagrass" | "fish_stock" | "awareness" | "protection", "value": -12, "target": "all" | "event" | "worst" | "best" | "hero" | <region id>}` - one-shot change ("event" = the card's region; worst/best by crisis).
+- `{"op": "resource", "key": "budget" | "political" | "science", "value": 40}` - one-shot.
+- `{"op": "temperature", "value": -0.05}` - one-shot.
+
+MUL keys (default 1.0): `inflow_mult` (coastal/river source inflow), `base_pollution_mult`, `neighbor_pressure_mult`, `spread_chance_mult`, `spread_damage_mult`, `heat_stress_mult`, `temp_rise_mult`, `coral_heat_mult`, `coral_recovery_mult`, `seagrass_recovery_mult`, `fishing_mult`, `fish_regen_mult`, `protect_effect_mult`, `aware_effect_mult`, `protect_decay_mult`, `awareness_decay_mult`, `budget_income_mult`, `political_income_mult`, `science_income_mult`, `cleanup_power_mult`, `patrol_power_mult`, `campaign_power_mult`, `action_cost_mult`, `node_cost_mult`, `bubble_rate_mult`, `bubble_value_mult`.
+ADD keys (default 0.0): `budget_per_tick`, `political_per_tick`, `science_per_tick`, `blue_carbon` (budget per tick per region whose seagrass is above `Balance.BLUE_CARBON_SEAGRASS`), `protection_floor`, `awareness_floor` (minimum level kept in every region).
+
+The simulation recomputes the whole modifier set every tick from scratch (adopted nodes with ramp, active evolutions, live timed event effects), so effects never stack by accident.
+
+### 11.3 Policy tree data (`tech_tree.gd` NODES, 24-28 nodes)
+
+Node schema: `{"id": "protect_mpa", "branch": "protect", "tier": 1-4, "slot": 0-1, "cost": {"budget": 0, "political": 25, "science": 0}, "requires": [ids], "ramp_ticks": 30, "effects": [...], "counters": [evolution id], "icon": "<icon id>", "name_key": "tree.protect_mpa.name", "desc_key": "tree.protect_mpa.desc", "fact_key": "tree.protect_mpa.fact"}`. Node ids are `<branch>_<name>`; keys follow `tree.<id>.name|desc|fact`. States: locked (requirements missing), available, adopted (permanent; effect ramps in over `ramp_ticks`).
+
+Branches and main currency (README: each resource is spent on different node types):
+- PROTECTION, political support (+ budget on late tiers): Marine Protected Areas, Posidonia Restoration, Coral Nursery, Blue Carbon, plus 2-3 more (e.g. Monk Seal and Caretta Sanctuaries, No-Take Zones).
+- SOURCE CUTTING, budget: Single-Use Plastic Ban, Ship Waste Inspection, River-Mouth Filters, Zero-Waste Ports, plus 2-3 more (e.g. Ghost-Net Recovery, Wastewater Upgrade).
+- SCIENCE & PUBLIC, science points: Satellite Monitoring, Citizen Science, School Curriculum, Anti-Disinformation, plus 2-3 more (e.g. Mucilage Early Warning for Marmara, Ocean Data Hub).
+- ECONOMY & DIPLOMACY, political support + budget: Sustainable Fishing Quotas, Green Tourism Label, Regional Treaty, Carbon Pricing, plus 2-3 more (e.g. Blue Bonds, Fishers Transition Fund).
+
+Each tier needs the previous tier of its branch; tiers 3-4 may also require one node of another branch. The `desc_key` text states the effect in plain words with the same numbers as the data. The `fact_key` text is one real, verifiable sentence used as the "Real world" line.
+
+Counter-evolution relationship (README): every node lists one evolution in `counters`. Adopting it cures that evolution if active and makes the crisis immune to it afterwards. Every evolution has 2-4 counter nodes, at least one outside the branch that provokes it.
+
+### 11.4 Crisis evolution (`tech_tree.gd` EVOLUTIONS)
+
+The simulation keeps the last `EVO_WINDOW` player moves (field operations by `Balance.ACTIONS[].branch`, adoptions by node branch). After `EVO_MIN_MOVES` moves, if one branch's share is at least `EVO_SHARE`, the crisis evolves that branch's resistance (once). Six resistances:
+- `source_surge` (branch source: cleanup-only play): production shifts upstream, `inflow_mult` up.
+- `illegal_fishing` (branch protect: protection-only play): poachers move in, `fishing_mult` up.
+- `disinformation` (branch science): campaign fatigue and fake news, `awareness_decay_mult` up, `political_income_mult` down.
+- `lobby_backlash` (branch economy): industry pushes back, `node_cost_mult` up, `political_income_mult` down.
+- `marine_heatwave` (trigger "heat": temperature at least `EVO_HEAT_TEMP`): `coral_heat_mult` and `heat_stress_mult` up.
+- `invasive_species` (trigger "spread": spread count at least `EVO_SPREAD_COUNT`; Suez and ballast water): `spread_chance_mult` up.
+
+Each evolution produces a toast (severity 3), a news headline (`news_key`) and `EventBus.evolution_happened`; curing produces `cured_news_key` and `EventBus.evolution_cured`. `evolution_pressure()` lets the UI warn before it happens.
+
+### 11.5 Decision events (`events.gd` EVENTS, 10-12 cards)
+
+Schema in `events.gd`. Two choices each; a choice whose cost is unaffordable is disabled; at least one choice per card costs nothing. Text may use `{region}` (the card's region name). Cards: oil spill, marine heatwave, COP31 summits (scheduled `at_tick` 250 / 500 / 750 = 2031 / 2036 / 2041), lobby pressure, media scandal (greenwashing), fishers' cooperative, tourism season surge (Antalya / Aegean), Marmara mucilage outbreak, foreign trawlers, ghost-net discovery, Caretta caretta nesting season, invasive lionfish from Suez. Random cards: first around tick 60-80, then every `EVENT_INTERVAL_MIN..MAX` ticks (target 9-12 cards per game including summits). The simulation picks the region by `region_rule`, applies the chosen effects, and emits a result toast plus a news headline.
+
+### 11.6 Data bubbles
+
+The simulation rolls bubbles each tick (`BUBBLE_CHANCE_PER_TICK x bubble_rate_mult`, at most `BUBBLES_MAX` alive): kind `"science"` (most) or `"political"`, a region (political weighted toward high awareness), `amount`, `ttl` ticks. `step()` returns `bubbles_spawned` / `bubbles_expired`; `collect_bubble(id)` pays `amount x bubble_value_mult`. `fx.gd` draws them as pooled screen-space Controls at `map.unproject_region(region)` plus a per-bubble offset, bobbing; click = `GameState.collect_bubble(id)`, pop burst and a floating "+N" label; fade on expiry. Bubbles are the main science income.
+
+### 11.7 News ticker
+
+Headlines come from `EventBus.news(key, args, tone)` (simulation: spreads, alarms, recoveries, temperature milestones, adoptions, evolutions, event outcomes) and from ambient templates the ticker generates every few seconds from live state (region stats, trends, real Mediterranean facts), mixing hopeful and alarming items. Items are stored as key + args and re-rendered on `language_changed`. Marquee in the HUD's 32 px top strip, tone-colored, continuous scroll.
+
+### 11.8 Live chart and HUD additions
+
+`GameState.get_history()` returns `[[tick, sea_health, crisis], ...]` sampled every `Balance.HISTORY_EVERY` (10) ticks. `charts.gd` adds a line chart (Sea Health vs Crisis, 2026-2046 x-axis, goal line at 60) placed in the BASIN STATUS panel. The HUD also adds: a POLICY TREE button with hotkey hint (emits `EventBus.tree_toggle_requested`), an active-resistances list with counter hints, an evolution-pressure warning, net income per year next to each resource with a red pulse when budget income is negative (the "death spiral" warning; snapshot keys `budget_rate`, `political_rate`, `science_rate` = net income per tick before spending), and Q/W/E hints on the field-operation buttons.
+
+### 11.9 Layout reservations (1920x1080)
+
+Ticker strip y 0-32 (HUD); top bar y 32-92; left panel x 16-356 from y 106 (status, gauge, then live chart, then resistances); right panel x 1500-1904 (region, field operations, then the tree button); toasts bottom-left; bubbles over the map area only. Tree modal: centered about 1600x860 over a dimmed backdrop (4 branch columns, node grid with drawn prerequisite links, a details pane with name, cost, effect text, counter evolution and "Real world" fact, an ADOPT button, an evolution-pressure strip). Event card: centered, about 760 px wide.
+
+### 11.10 Icons
+
+The tree UI module owns `icons.gd` and adds: one distinct icon per node (`icon` field), one per branch (`branch_protect`, `branch_source`, `branch_science`, `branch_economy`), one per evolution and per event, plus `tree`, `evolution`, `event`, `news`, `bubble_science`, `bubble_political` for the HUD.
+
+### 11.11 String tables
+
+`i18n.gd` merges `STRINGS` with `i18n_tree.gd`, `i18n_events.gd`, `i18n_sim.gd`, `i18n_ui_tree.gd`, `i18n_hud.gd` (owners in 11.1). Builders write `"en"`; the localization pass adds `"tr"` and `"ru"` to every key. Keys must be unique across tables (I18n warns on duplicates).
+
+### 11.12 Phase 2 balance targets (sim_test)
+
+All Phase 1 targets still hold with the new systems on. Bots now also adopt nodes, answer cards and collect about 60% of bubbles. Do-nothing loses 2040-2045. Spamming one branch (operations plus nodes) triggers its resistance within about 3-5 minutes of game time and does not win. Balanced play (diversified operations and adoptions, sensible card choices) wins with sea health about 60-75%. 9-12 cards per game; the first evolution of a one-sided bot around 2030-2033; a balanced bot adopts roughly 14-20 nodes by 2046 (not all).
