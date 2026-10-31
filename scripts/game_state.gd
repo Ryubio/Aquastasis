@@ -6,6 +6,10 @@ extends Node
 const CrisisSim := preload("res://scripts/crisis_sim.gd")
 const RegionData := preload("res://scripts/region.gd")
 
+## Sim toast keys that may be newer than the string table: if I18n lacks one, the toast
+## uses this older key with a close meaning instead of showing the raw key.
+const TOAST_KEY_FALLBACK := {"toast.depleted": "toast.low_resources"}
+
 var sim: CrisisSim = null
 var running: bool = false          # a game is in progress (false in menus and after game over)
 var menu_paused: bool = false      # pause menu is open
@@ -181,7 +185,10 @@ func _publish_result(result: Dictionary) -> void:
 	for t in toasts:
 		var item: Array = t
 		var args: Dictionary = item[1]
-		EventBus.toast.emit(str(item[0]), args, int(item[2]))
+		var key: String = str(item[0])
+		if TOAST_KEY_FALLBACK.has(key) and not I18n.has_key(key):
+			key = str(TOAST_KEY_FALLBACK[key])
+		EventBus.toast.emit(key, args, int(item[2]))
 
 
 func _on_region_selected(region_id: String) -> void:

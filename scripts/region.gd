@@ -105,7 +105,12 @@ const DEFS := {
 		"polygon": [
 			Vector2(14.37, -3.53), Vector2(14.83, -3.35), Vector2(15.52, -3.35), Vector2(16.67, -3.1),
 			Vector2(17.45, -3.15), Vector2(17.85, -3.3), Vector2(18.45, -3.28), Vector2(19.35, -3.6),
-			Vector2(20.96, -3.62), Vector2(21.42, -8.14), Vector2(20.08, -7.36), Vector2(19.67, -7.53),
+			Vector2(20.96, -3.62),
+			# eastern basin: these edges sit 0.1-0.2 units under the Anatolian / Caucasus coast
+			Vector2(21.9, -3.4), Vector2(22.35, -2.85), Vector2(23.5, -2.6), Vector2(24.4, -2.42),
+			Vector2(25.7, -2.47), Vector2(26.5, -2.5), Vector2(27.85, -3.35), Vector2(27.7, -4.5),
+			Vector2(26.6, -5.45), Vector2(25.1, -6.75), Vector2(23.6, -7.55), Vector2(22.6, -8.45),
+			Vector2(21.42, -8.14), Vector2(20.08, -7.36), Vector2(19.67, -7.53),
 			Vector2(18.97, -8.27), Vector2(19.75, -8.8), Vector2(19.8, -9.02), Vector2(19.68, -9.21),
 			Vector2(18.65, -9.5), Vector2(17.88, -10.17), Vector2(16.53, -10.0), Vector2(15.36, -7.98),
 			Vector2(14.4, -6.92), Vector2(14.31, -6.36), Vector2(13.66, -5.54), Vector2(13.6, -4.67),

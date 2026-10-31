@@ -35,6 +35,14 @@ func _init() -> void:
 	mouse_filter = Control.MOUSE_FILTER_IGNORE
 
 
+func _ready() -> void:
+	EventBus.language_changed.connect(_on_language_changed)
+
+
+func _on_language_changed(_lang: String) -> void:
+	_update_label()   # the percent format depends on the language (tr: %60, en/ru: 60%)
+
+
 func setup_bar(color_mode: String, tint: Color, height: float) -> void:
 	kind = "bar"
 	mode = color_mode
@@ -130,7 +138,7 @@ func _update_label() -> void:
 static func format_value(v: float, fmt: String) -> String:
 	match fmt:
 		"pct":
-			return str(roundi(v)) + "%"
+			return I18n.t("fmt.pct", {"v": str(roundi(v))})
 		"int":
 			return str(roundi(v))
 		"temp":
@@ -273,7 +281,9 @@ func _draw_gauge() -> void:
 		var txt: String = "+%.1f" % tv
 		var fs: int = 11
 		var tsz: Vector2 = font.get_string_size(txt, HORIZONTAL_ALIGNMENT_LEFT, -1, fs)
-		var lp: Vector2 = c + d * (r * 1.16 + 13.0) - Vector2(tsz.x * 0.5, -fs * 0.35)
+		# Push the label centre out by its own half-extent along the ray so near-horizontal
+		# labels (+2.0, +3.5) clear their tick ends.
+		var lp: Vector2 = c + d * (r * 1.16 + 6.0 + absf(d.x) * tsz.x * 0.5 + absf(d.y) * float(fs) * 0.5) - Vector2(tsz.x * 0.5, -float(fs) * 0.35)
 		var lc: Color = UITheme.CRISIS if tv >= 4.0 else UITheme.TEXT_DIM
 		draw_string(font, lp, txt, HORIZONTAL_ALIGNMENT_LEFT, -1, fs, lc)
 

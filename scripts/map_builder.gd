@@ -41,6 +41,23 @@ const MENU_PITCH := 50.0
 const LABEL_PIXEL := 0.036
 const NAME_FONT_SIZE := 22
 const STATUS_FONT_SIZE := 15
+const LABEL_LIFT := 0.35
+const LABEL_PICK_PAD := 6.0       # font pixels of extra clickable margin around a label
+## Label offset from the region anchor (map units): keeps "Antalya Gulf" off the hero ring.
+const LABEL_OFFSET := {"antalya": Vector2(1.6, 0.2)}
+
+## Render-only outline refinements: extra water merged into a region's mesh, outline and
+## picking (the simulation never uses polygon area). The eastern Black Sea basin beyond the
+## region's straight cut at x ~21 would otherwise show the bare sea floor between the coasts.
+## Every new edge lies 0.1-0.2 units under the europe/asia land slabs.
+const REGION_EXTENSIONS := {
+	"blacksea": [
+		Vector2(20.4, -3.75), Vector2(21.0, -3.55), Vector2(21.9, -3.4), Vector2(22.35, -2.85),
+		Vector2(23.5, -2.6), Vector2(24.4, -2.42), Vector2(25.7, -2.47), Vector2(26.5, -2.5),
+		Vector2(27.85, -3.35), Vector2(27.7, -4.5), Vector2(26.6, -5.45), Vector2(25.1, -6.75),
+		Vector2(23.6, -7.55), Vector2(22.6, -8.45), Vector2(21.45, -8.25), Vector2(20.5, -7.5),
+	],
+}
 
 const BEACON_SHADER_CODE := """
 shader_type spatial;
@@ -261,9 +278,13 @@ const CITY_LIGHTS := [
 class RegionView extends RefCounted:
 	var id: String = ""
 	var anchor: Vector2 = Vector2.ZERO
+	var poly: PackedVector2Array = PackedVector2Array()    # rendered outline (may be extended)
+	var extended: bool = false                             # poly differs from RegionData
 	var mat: ShaderMaterial = null
 	var name_label: Label3D = null
 	var status_label: Label3D = null
+	var name_size: Vector2 = Vector2.ZERO                  # label text size in world units
+	var status_size: Vector2 = Vector2.ZERO
 	var outline_mi: MeshInstance3D = null
 	var outline_mat: ShaderMaterial = null
 	var health: float = 0.5
@@ -313,6 +334,8 @@ var _pending_flashes: Array = []   # [[seconds_left: float, region_id: String], 
 var _label_font: SystemFont = null
 var _hero_label: Label3D = null
 var _label_alpha: float = 0.0
+var _hero_alpha: float = 1.0
+var _end_open: bool = false        # menu mode is showing the end screen (hero label hidden)
 
 var _cam_target: Vector3 = MENU_TARGET
 var _cam_dist: float = MENU_DIST
@@ -360,10 +383,15 @@ func _ready() -> void:
 
 ## true: cinematic idle camera, picking disabled (main menu / end screen).
 func set_menu_mode(on: bool) -> void:
+	if not on or _menu_mode:
+		# Gameplay, or menu mode asked again while already on (end screen -> main menu):
+		# the end screen is gone, so the hero label may show again.
+		_end_open = false
 	_menu_mode = on
 	if on:
 		_mouse_on_map = false
 		_set_hover("")
+		_clear_selection()
 	if _time <= 0.0:
 		# Nothing rendered yet (startup / --autostart): jump straight to the framing.
 		_snap_camera = true
@@ -509,11 +537,34 @@ func _build_land() -> void:
 	_add_mesh(coast.commit(), _grid_material(2), "Coastline")
 
 
+## Region outline as rendered and picked: RegionData's polygon, merged with its entry in
+## REGION_EXTENSIONS unless region.gd already covers that water. Falls back to the plain
+## polygon whenever the merge does not give exactly one outline.
+func _render_polygon(region_id: String) -> PackedVector2Array:
+	var poly: PackedVector2Array = RegionData.polygon_of(region_id)
+	if not REGION_EXTENSIONS.has(region_id):
+		return poly
+	var ext_pts: Array = REGION_EXTENSIONS[region_id]
+	var ext := PackedVector2Array()
+	for v in ext_pts:
+		var q: Vector2 = v
+		ext.append(q)
+	if Geometry2D.is_point_in_polygon(RegionData.centroid(ext), poly):
+		return poly
+	var merged: Array = Geometry2D.merge_polygons(poly, ext)
+	if merged.size() != 1:
+		return poly
+	var out: PackedVector2Array = merged[0]
+	if out.size() < 3:
+		return poly
+	return out
+
+
 func _build_regions() -> void:
 	var index: int = 0
 	for rid in RegionData.IDS:
 		var region_id: String = rid
-		var poly: PackedVector2Array = RegionData.polygon_of(region_id)
+		var poly: PackedVector2Array = _render_polygon(region_id)
 		var mat := ShaderMaterial.new()
 		mat.shader = SEA_SHADER
 		mat.set_shader_parameter("healthy_color", UITheme.HEALTHY)
@@ -527,6 +578,8 @@ func _build_regions() -> void:
 		var rv := RegionView.new()
 		rv.id = region_id
 		rv.anchor = RegionData.anchor_of(region_id)
+		rv.poly = poly
+		rv.extended = poly != RegionData.polygon_of(region_id)
 		rv.mat = mat
 		# Selection / hover marquee: dashed ribbon on the region outline, drawn above the land.
 		var ost := SurfaceTool.new()
@@ -710,7 +763,11 @@ func _build_labels() -> void:
 	for rid in RegionData.IDS:
 		var region_id: String = rid
 		var rv: RegionView = _views[region_id]
-		var pos := Vector3(rv.anchor.x, 0.35, rv.anchor.y)
+		var at: Vector2 = rv.anchor
+		if LABEL_OFFSET.has(region_id):
+			var off: Vector2 = LABEL_OFFSET[region_id]
+			at += off
+		var pos := Vector3(at.x, LABEL_LIFT, at.y)
 		rv.name_label = _make_label(NAME_FONT_SIZE, UITheme.TEXT)
 		rv.name_label.vertical_alignment = VERTICAL_ALIGNMENT_BOTTOM
 		rv.name_label.position = pos
@@ -720,6 +777,35 @@ func _build_labels() -> void:
 		rv.status_label.vertical_alignment = VERTICAL_ALIGNMENT_TOP
 		rv.status_label.position = pos
 		add_child(rv.status_label)
+		_measure_labels(rv)
+
+
+## Text size of a Label3D in world units (autowrapped like the label, plus the outline).
+func _label_size(lbl: Label3D) -> Vector2:
+	if lbl == null or lbl.text == "" or _label_font == null:
+		return Vector2.ZERO
+	var px: Vector2 = _label_font.get_multiline_string_size(lbl.text, HORIZONTAL_ALIGNMENT_CENTER, lbl.width, lbl.font_size)
+	return (px + Vector2(lbl.outline_size, lbl.outline_size)) * lbl.pixel_size
+
+
+## Caches the label sizes (picking) and hands the labels' ground footprint to the sea shader,
+## which keeps its selection rings out from under the text.
+func _measure_labels(rv: RegionView) -> void:
+	if rv.name_label == null or rv.status_label == null:
+		return
+	rv.name_size = _label_size(rv.name_label)
+	rv.status_size = _label_size(rv.status_label)
+	# Billboard text seen from the gameplay pitch: the name sits above the anchor on screen
+	# (farther north on the ground), the status below it.
+	var pitch: float = deg_to_rad(GAME_PITCH)
+	var to_ground: float = 1.0 / sin(pitch)
+	var base_z: float = rv.name_label.position.z - LABEL_LIFT * cos(pitch) / sin(pitch)
+	var north: float = base_z - rv.name_size.y * to_ground
+	var south: float = base_z + rv.status_size.y * to_ground
+	var half_w: float = maxf(rv.name_size.x, rv.status_size.x) * 0.5
+	var center := Vector2(rv.name_label.position.x, (north + south) * 0.5)
+	rv.mat.set_shader_parameter("label_center", center)
+	rv.mat.set_shader_parameter("label_half", Vector2(half_w, (south - north) * 0.5))
 
 
 func _make_label(font_size: int, color: Color) -> Label3D:
@@ -751,6 +837,7 @@ func _connect_bus() -> void:
 	EventBus.region_selected.connect(_on_region_selected)
 	EventBus.language_changed.connect(_on_language_changed)
 	EventBus.game_started.connect(_on_game_started)
+	EventBus.game_over.connect(_on_game_over)
 
 
 # =====================================================================================
@@ -1102,12 +1189,13 @@ func _update_regions(delta: float) -> void:
 		rv.crisis = lerpf(rv.crisis, rv.crisis_goal, k)
 		rv.protection = lerpf(rv.protection, rv.protection_goal, k)
 		var hover_goal: float = 1.0 if rv.id == _hovered else 0.0
-		var sel_goal: float = 1.0 if rv.id == _selected else 0.0
+		# Selection marks (walls, rim, rings) fade out in menu mode, like the outline does.
+		var sel_goal: float = 1.0 if (rv.id == _selected and not _menu_mode) else 0.0
 		rv.highlight = lerpf(rv.highlight, hover_goal, kh)
 		rv.selected = lerpf(rv.selected, sel_goal, kh)
 		rv.flash = maxf(rv.flash - delta * 1.3, 0.0)
 		rv.pulse = maxf(rv.pulse - delta / 1.5, 0.0)
-		var vis: float = smoothstep(0.28, 0.78, rv.health)
+		var vis: float = smoothstep(0.25, 0.92, rv.health)  # same remap as vis_health() in sea.gdshader
 		rv.wave_phase += delta * lerpf(0.3, 1.0, vis)
 		var mat: ShaderMaterial = rv.mat
 		mat.set_shader_parameter("health", rv.health)
@@ -1194,7 +1282,9 @@ func _update_labels(delta: float) -> void:
 		rv.status_label.visible = vis
 		if not vis:
 			continue
-		var c: Color = UITheme.TEXT.lerp(Color(1.0, 1.0, 1.0), rv.highlight).lerp(UITheme.AMBER, rv.selected)
+		# Selected names go bright white (the amber marquee and rim already mark selection;
+		# amber text would sink into the amber hero beacon and marquee).
+		var c: Color = UITheme.TEXT.lerp(Color(1.0, 1.0, 1.0), maxf(rv.highlight, rv.selected))
 		c.a = _label_alpha
 		rv.name_label.modulate = c
 		rv.name_label.outline_modulate = outline
@@ -1202,6 +1292,19 @@ func _update_labels(delta: float) -> void:
 		sc.a = _label_alpha
 		rv.status_label.modulate = sc
 		rv.status_label.outline_modulate = outline
+
+	# The hero label fades out behind the end screen (it would poke out of the end panel).
+	if _hero_label != null:
+		var hg: float = 0.0 if (_menu_mode and _end_open) else 1.0
+		if delta > 0.0:
+			_hero_alpha = move_toward(_hero_alpha, hg, delta * 1.8)
+		else:
+			_hero_alpha = hg
+		_hero_label.visible = _hero_alpha > 0.01
+		var hc: Color = UITheme.AMBER
+		hc.a = _hero_alpha
+		_hero_label.modulate = hc
+		_hero_label.outline_modulate = Color(UITheme.BG.r, UITheme.BG.g, UITheme.BG.b, 0.88 * _hero_alpha)
 
 
 func _update_camera(delta: float) -> void:
@@ -1316,16 +1419,70 @@ func _set_hover(region_id: String) -> void:
 
 
 ## Region id under a screen position, "" for land, empty sea or a ray that misses the plane.
+## Region labels are drawn on top of everything, so a click on a label picks its region
+## (tiny regions such as Marmara are mostly covered by their own label).
 func _pick(screen_pos: Vector2) -> String:
 	if camera == null or not camera.is_inside_tree():
 		return ""
+	var by_label: String = _pick_label(screen_pos)
+	if by_label != "":
+		return by_label
 	var origin: Vector3 = camera.project_ray_origin(screen_pos)
 	var direction: Vector3 = camera.project_ray_normal(screen_pos)
 	var hit: Variant = Plane(Vector3.UP, SEA_Y).intersects_ray(origin, direction)
 	if hit == null:
 		return ""
 	var p: Vector3 = hit
-	return RegionData.region_at(Vector2(p.x, p.z))
+	var point := Vector2(p.x, p.z)
+	var found: String = RegionData.region_at(point)
+	if found != "":
+		return found
+	# Render-only extensions (REGION_EXTENSIONS) pick like the rest of their region.
+	for rid in _views:
+		var rv: RegionView = _views[rid]
+		if rv.extended and Geometry2D.is_point_in_polygon(point, rv.poly):
+			return rv.id
+	return ""
+
+
+## Region whose name/status label covers the screen position ("" if none or labels hidden).
+## Labels are camera-facing billboards: name text above the label position, status below.
+func _pick_label(screen_pos: Vector2) -> String:
+	if _label_alpha < 0.5:
+		return ""
+	var bx: Vector3 = camera.global_transform.basis.x
+	var by: Vector3 = camera.global_transform.basis.y
+	var pad: float = LABEL_PICK_PAD * LABEL_PIXEL
+	var best: String = ""
+	var best_d: float = INF
+	for rid in _views:
+		var rv: RegionView = _views[rid]
+		if rv.name_label == null or not rv.name_label.visible:
+			continue
+		var base: Vector3 = rv.name_label.global_position
+		var name_rect: Rect2 = _billboard_rect(base, bx * (rv.name_size.x * 0.5 + pad), by * (rv.name_size.y + pad))
+		var stat_rect: Rect2 = _billboard_rect(base, bx * (rv.status_size.x * 0.5 + pad), -by * (rv.status_size.y + pad))
+		var hit_rect: Rect2
+		if name_rect.has_point(screen_pos):
+			hit_rect = name_rect
+		elif stat_rect.has_point(screen_pos):
+			hit_rect = stat_rect
+		else:
+			continue
+		var d: float = hit_rect.get_center().distance_squared_to(screen_pos)
+		if d < best_d:
+			best_d = d
+			best = rv.id
+	return best
+
+
+## Screen rect of a billboard quad spanning base +- half_x and base .. base + up.
+func _billboard_rect(base: Vector3, half_x: Vector3, up: Vector3) -> Rect2:
+	var r := Rect2(camera.unproject_position(base - half_x), Vector2.ZERO)
+	r = r.expand(camera.unproject_position(base + half_x))
+	r = r.expand(camera.unproject_position(base - half_x + up))
+	r = r.expand(camera.unproject_position(base + half_x + up))
+	return r
 
 
 # =====================================================================================
@@ -1359,6 +1516,7 @@ func _refresh_status_label(rv: RegionView) -> void:
 	if rv.status_label == null or rv.status == "":
 		return
 	rv.status_label.text = I18n.t("hud.status." + rv.status)
+	_measure_labels(rv)
 
 
 func _status_color(status: String) -> Color:
@@ -1380,6 +1538,7 @@ func _refresh_labels() -> void:
 		if rv.name_label != null:
 			rv.name_label.text = I18n.t(RegionData.name_key_of(rv.id))
 		_refresh_status_label(rv)
+		_measure_labels(rv)
 	if _hero_label != null:
 		_hero_label.text = I18n.t("map.hero_label")
 
@@ -1410,6 +1569,8 @@ func _on_spread_happened(from_id: String, to_id: String) -> void:
 	elif _views.has(to_id):
 		var dst: RegionView = _views[to_id]
 		dst.flash = 1.0
+	if to_id == RegionData.HERO_ID:
+		shake(0.2)
 
 
 func _on_toast(_text_key: String, _args: Dictionary, severity: int) -> void:
@@ -1434,13 +1595,26 @@ func _on_region_selected(region_id: String) -> void:
 	_selected = region_id if _views.has(region_id) else ""
 
 
+## Deselects through the bus so GameState.selected_region and the HUD clear as well.
+func _clear_selection() -> void:
+	if _selected != "" or GameState.selected_region != "":
+		EventBus.region_selected.emit("")
+
+
 func _on_language_changed(_lang: String) -> void:
 	_refresh_labels()
 
 
 func _on_game_started() -> void:
+	_end_open = false
 	_pending_flashes.clear()
 	for item in _routes:
 		var rt: RouteView = item
 		rt.burst = -1.0
 		rt.flash = 0.0
+	# Every game starts with nothing selected (--select=id is applied after game_started).
+	_clear_selection()
+
+
+func _on_game_over(_won: bool, _reason: String, _stats: Dictionary) -> void:
+	_end_open = true

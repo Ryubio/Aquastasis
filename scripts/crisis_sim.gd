@@ -402,7 +402,7 @@ func _update_resources(toasts: Array) -> void:
 	if depleted:
 		_depleted_ticks += 1
 		if _depleted_ticks == 1:
-			_push_toast(toasts, "depleted", "toast.low_resources", {}, 3, B.TOAST_MIN_GAP_TICKS)
+			_push_toast(toasts, "depleted", "toast.depleted", {}, 3, B.TOAST_MIN_GAP_TICKS)
 	else:
 		_depleted_ticks = 0
 

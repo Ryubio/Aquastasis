@@ -381,20 +381,19 @@ func _draw_title() -> void:
 	if n == 0:
 		return
 	var font: Font = UITheme.mono_bold_font()
-	var avail: float = _title_ctrl.size.x
-	var fs: int = TITLE_MAX_SIZE
+	# Glyphs are always rasterized at the final size (spacing 6) and zoomed with a draw
+	# transform, so the letter-spacing intro never builds a new glyph cache per frame.
+	var fs_end: float = _title_fit_size(text, font, 6.0)
+	var fs: int = floori(fs_end)
+	var k: float = _title_fit_size(text, font, _title_spacing) / fs_end
 	var spacing: float = _title_spacing
-	var natural: float = font.get_string_size(text, HORIZONTAL_ALIGNMENT_LEFT, -1, fs).x + spacing * float(n - 1)
-	if natural > avail and natural > 0.0:
-		var nat_no_space: float = font.get_string_size(text, HORIZONTAL_ALIGNMENT_LEFT, -1, fs).x
-		fs = maxi(28, int(floor(float(fs) * (avail - spacing * float(n - 1)) / maxf(nat_no_space, 1.0))))
-	var ascent: float = font.get_ascent(fs)
-	var base_y: float = (_title_ctrl.size.y - font.get_height(fs)) * 0.5 + ascent
+	var ascent: float = font.get_ascent(fs) * k
+	var base_y: float = (_title_ctrl.size.y - font.get_height(fs) * k) * 0.5 + ascent
 	var x: float = 0.0
 	var warm: Color = UITheme.TEXT.lerp(UITheme.AMBER, 0.18)
 	for i in n:
 		var ch: String = text[i]
-		var w: float = font.get_string_size(ch, HORIZONTAL_ALIGNMENT_LEFT, -1, fs).x
+		var w: float = font.get_string_size(ch, HORIZONTAL_ALIGNMENT_LEFT, -1, fs).x * k
 		var a: float = clampf(_title_reveal * float(n + 6) - float(i), 0.0, 1.0)
 		if a > 0.0 and ch != " ":
 			var flick: float = 1.0
@@ -402,10 +401,24 @@ func _draw_title() -> void:
 			if noise > 0.975:
 				flick = 0.78
 			var pos := Vector2(x, base_y - (1.0 - a) * 18.0)
-			_title_ctrl.draw_char_outline(font, pos, ch, fs, 14, UITheme.with_alpha(UITheme.AMBER, 0.07 * a * flick))
-			_title_ctrl.draw_char_outline(font, pos, ch, fs, 6, UITheme.with_alpha(UITheme.AMBER, 0.16 * a * flick))
-			_title_ctrl.draw_char(font, pos, ch, fs, UITheme.with_alpha(warm, a * flick))
+			_title_ctrl.draw_set_transform(pos, 0.0, Vector2(k, k))
+			_title_ctrl.draw_char_outline(font, Vector2.ZERO, ch, fs, 14, UITheme.with_alpha(UITheme.AMBER, 0.07 * a * flick))
+			_title_ctrl.draw_char_outline(font, Vector2.ZERO, ch, fs, 6, UITheme.with_alpha(UITheme.AMBER, 0.16 * a * flick))
+			_title_ctrl.draw_char(font, Vector2.ZERO, ch, fs, UITheme.with_alpha(warm, a * flick))
 		x += w + spacing
+	_title_ctrl.draw_set_transform(Vector2.ZERO, 0.0, Vector2.ONE)
+
+
+## Font size (unfloored, 28..TITLE_MAX_SIZE) at which the title fits the column with the
+## given letter spacing.
+func _title_fit_size(text: String, font: Font, spacing: float) -> float:
+	var n: int = text.length()
+	var avail: float = _title_ctrl.size.x
+	var nat: float = font.get_string_size(text, HORIZONTAL_ALIGNMENT_LEFT, -1, TITLE_MAX_SIZE).x
+	var fs_f: float = float(TITLE_MAX_SIZE)
+	if nat > 0.0 and nat + spacing * float(maxi(n - 1, 0)) > avail:
+		fs_f = float(TITLE_MAX_SIZE) * (avail - spacing * float(maxi(n - 1, 0))) / nat
+	return clampf(fs_f, 28.0, float(TITLE_MAX_SIZE))
 
 
 # --- Pause menu --------------------------------------------------------------------------
@@ -518,6 +531,8 @@ func _build_end() -> void:
 	_end_title.add_theme_font_size_override("font_size", 54)
 	_end_title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	_end_title.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	# Shape the full text once, then reveal it: no re-centering or reflow while it types.
+	_end_title.visible_characters_behavior = TextServer.VC_CHARS_AFTER_SHAPING
 	col.add_child(_end_title)
 	_end_pulse = Charts.new()
 	_end_pulse.setup_pulse(Vector2(680.0, 52.0))
@@ -527,6 +542,7 @@ func _build_end() -> void:
 	_end_text.add_theme_font_size_override("font_size", 19)
 	_end_text.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	_end_text.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	_end_text.visible_characters_behavior = TextServer.VC_CHARS_AFTER_SHAPING
 	_end_text.custom_minimum_size = Vector2(680.0, 0.0)
 	col.add_child(_end_text)
 	var sep := HSeparator.new()
@@ -588,7 +604,10 @@ func _render_end_texts() -> void:
 	var keys: Array = _end_keys()
 	var sh: float = float(_end_stats.get("sea_health", 0.0))
 	var yr: int = int(_end_stats.get("year_int", Balance.END_YEAR))
-	var args: Dictionary = {"health": str(roundi(sh)), "year": str(yr)}
+	# A loss floors the value: rounding would show "10%" on a below-10% ending, or a
+	# winning-looking "60%" on a 59.7% time-out.
+	var sh_i: int = roundi(sh) if _end_won else floori(sh)
+	var args: Dictionary = {"health": str(sh_i), "year": str(yr)}
 	_end_title.text = I18n.t(str(keys[0]))
 	_end_text.text = I18n.t(str(keys[1]), args)
 	var accent: Color = UITheme.HEALTHY if _end_won else UITheme.CRISIS
@@ -612,7 +631,7 @@ func _render_end_stats() -> void:
 	var yr: int = int(_end_stats.get("year_int", Balance.END_YEAR))
 	var acts: int = int(_end_stats.get("actions_used", 0))
 	var texts: Array = [
-		I18n.t("end.stat.health", {"v": str(roundi(sh * p))}),
+		I18n.t("end.stat.health", {"v": str(roundi(sh * p) if _end_won else floori(sh * p))}),
 		I18n.t("end.stat.temp", {"v": "%.2f" % lerpf(Charts.TEMP_MIN, temp, p)}),
 		I18n.t("end.stat.year", {"v": str(int(round(lerpf(float(Balance.START_YEAR), float(yr), p))))}),
 		I18n.t("end.stat.actions", {"v": str(roundi(float(acts) * p))}),

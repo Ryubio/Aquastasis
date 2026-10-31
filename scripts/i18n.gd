@@ -18,6 +18,9 @@ const STRINGS := {
 	"lang.native.en": {"tr": "English", "en": "English", "ru": "English"},
 	"lang.native.ru": {"tr": "Русский", "en": "Русский", "ru": "Русский"},
 
+	# --- Number formats (code-built values; Turkish puts the percent sign first) ---
+	"fmt.pct": {"tr": "%{v}", "en": "{v}%", "ru": "{v}%"},
+
 	# --- Title ---
 	"game.title": {"tr": "AKDENİZ'İN NABZI", "en": "PULSE OF THE MEDITERRANEAN", "ru": "ПУЛЬС СРЕДИЗЕМНОМОРЬЯ"},
 	"game.subtitle": {
@@ -190,6 +193,11 @@ const STRINGS := {
 		"tr": "Bütçe ve siyasi destek tükenmek üzere!",
 		"en": "Budget and political support are running low!",
 		"ru": "Бюджет и политическая поддержка на исходе!",
+	},
+	"toast.depleted": {
+		"tr": "Bütçe ve siyasi destek tükendi! Kaynak gelmezse koalisyon dağılacak.",
+		"en": "Budget and political support exhausted! The coalition collapses unless funds return.",
+		"ru": "Бюджет и политическая поддержка исчерпаны! Без средств коалиция распадётся.",
 	},
 
 	# --- End screens ---

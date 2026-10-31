@@ -53,6 +53,7 @@ func _ready() -> void:
 
 
 func _start_game() -> void:
+	_clear_selection()
 	menu.hide_all()
 	map.set_menu_mode(false)
 	hud.show_hud()
@@ -62,9 +63,17 @@ func _start_game() -> void:
 
 func _to_main_menu() -> void:
 	GameState.stop_game()
+	_clear_selection()
 	hud.hide_hud()
 	map.set_menu_mode(true)
 	menu.show_main()
+
+
+## Drops a region selection left over from the last game (map, HUD and GameState all
+## follow region_selected), so menus and the next game start with nothing selected.
+func _clear_selection() -> void:
+	if GameState.selected_region != "":
+		EventBus.region_selected.emit("")
 
 
 func _open_pause() -> void:
@@ -82,6 +91,7 @@ func _quit() -> void:
 
 
 func _on_game_over(won: bool, reason: String, stats: Dictionary) -> void:
+	_clear_selection()
 	hud.hide_hud()
 	map.set_menu_mode(true)
 	menu.show_end(won, reason, stats)

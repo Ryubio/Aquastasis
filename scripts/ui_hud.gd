@@ -68,6 +68,7 @@ var _years_left_label: Label
 var _timeline: Charts
 var _speed_buttons: Array = []
 var _paused_chip: PanelContainer
+var _chip_on: bool = false          # chip keeps its layout slot; only its alpha changes
 var _res_labels: Dictionary = {}    # key -> value Label
 var _res_shown: Dictionary = {}
 var _res_target: Dictionary = {}
@@ -327,7 +328,9 @@ func _build_top_bar() -> void:
 	var pl := _label("BadgeLabel", "ui.pause.title")
 	pl.add_theme_color_override("font_color", UITheme.WARNING)
 	_paused_chip.add_child(pl)
-	_paused_chip.visible = false
+	# Always laid out (alpha 0 while running): toggling visible would resize the expanding
+	# timeline and slide the speed buttons out from under the cursor on every pause.
+	_paused_chip.modulate.a = 0.0
 	speed_row.add_child(_paused_chip)
 	row.add_child(_vline(40.0))
 
@@ -731,6 +734,9 @@ func _place_tip() -> void:
 	var p := Vector2.ZERO
 	if _tip_side == "below":
 		p = Vector2(op.x + osz.x * 0.5 - ts.x * 0.5, op.y + osz.y + 10.0)
+	elif _tip_side == "under_panel":
+		# Below the REGION panel, clear of the sea regions (east edge ~x 1465 at 1080p).
+		p = Vector2(_right_panel.position.x + (_right_panel.size.x - ts.x) * 0.5, _right_panel.position.y + _right_panel.size.y + 10.0)
 	else:
 		p = Vector2(_right_panel.position.x - ts.x - 14.0, op.y)
 	p.x = clampf(p.x, 8.0, vs.x - ts.x - 8.0)
@@ -767,7 +773,7 @@ func _on_action_hover(btn: Button, action_id: String) -> void:
 		if cost.has(res_key):
 			parts.append(str(roundi(float(cost[res_key]))) + " " + I18n.t(RES_KEYS[res_key]))
 	var meta: String = I18n.t("hud.cost_line", {"list": ", ".join(parts)})
-	_show_tip(btn, I18n.t(str(def.get("name_key", ""))), I18n.t(str(def.get("desc_key", ""))), meta, "left")
+	_show_tip(btn, I18n.t(str(def.get("name_key", ""))), I18n.t(str(def.get("desc_key", ""))), meta, "under_panel")
 
 
 func _toast_text(text_key: String, args: Dictionary) -> String:
@@ -1025,7 +1031,7 @@ func _update_region(data: Dictionary, force: bool) -> void:
 		var key: String = k
 		var bar: Charts = _stat_bars[key]
 		bar.set_value(float(data.get(key, 0.0)))
-	_coastal_value.text = str(roundi(float(data.get("coastal_pop", 0.0)) * 100.0)) + "%"
+	_coastal_value.text = I18n.t("fmt.pct", {"v": str(roundi(float(data.get("coastal_pop", 0.0)) * 100.0))})
 
 
 func _refresh_actions() -> void:
@@ -1041,6 +1047,10 @@ func _refresh_actions() -> void:
 		var cd_frac: float = 0.0
 		if has_region:
 			cd_left = GameState.action_cooldown_left(id, _selected)
+			# action_cooldown_left() is in 1x seconds; show real seconds at 2x / 4x.
+			var mult: float = Balance.SPEEDS[GameState.speed_index]
+			if mult > 0.0:
+				cd_left /= mult
 			cd_frac = GameState.action_cooldown_fraction(id, _selected)
 		var afford: bool = GameState.can_afford(id)
 		var can: bool = has_region and GameState.can_perform(id, _selected)
@@ -1080,6 +1090,7 @@ func _refresh_actions() -> void:
 
 
 func _on_action_pressed(action_id: String) -> void:
+	_hide_tip_now()   # never leave the tip over the map while the action pulse plays
 	if _selected == "":
 		return
 	GameState.perform_action(action_id, _selected)
@@ -1114,11 +1125,11 @@ func _on_speed_changed(speed_index: int) -> void:
 	for i in _speed_buttons.size():
 		var btn: Button = _speed_buttons[i]
 		btn.set_pressed_no_signal(i == speed_index)
-	_paused_chip.visible = speed_index == 0 and GameState.running
+	_chip_on = speed_index == 0 and GameState.running
 
 
 func _on_paused_changed(_paused: bool) -> void:
-	_paused_chip.visible = GameState.speed_index == 0 and GameState.running
+	_chip_on = GameState.speed_index == 0 and GameState.running
 
 
 func _on_language_changed(_lang: String) -> void:
@@ -1163,8 +1174,7 @@ func _process(delta: float) -> void:
 			var l: Label = _res_labels[key]
 			l.text = str(roundi(shown))
 	_ticker_strip.queue_redraw()
-	if _paused_chip.visible:
-		_paused_chip.modulate.a = 0.55 + 0.45 * (0.5 + 0.5 * sin(_time * 5.0))
+	_paused_chip.modulate.a = (0.55 + 0.45 * (0.5 + 0.5 * sin(_time * 5.0))) if _chip_on else 0.0
 	_live_dot.modulate.a = 0.35 + 0.65 * (0.5 + 0.5 * sin(_time * 3.0))
 	if _hint_box.visible:
 		_hint_icon.pivot_offset = _hint_icon.size * 0.5
