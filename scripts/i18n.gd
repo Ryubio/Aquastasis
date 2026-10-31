@@ -22,11 +22,11 @@ const STRINGS := {
 	"fmt.pct": {"tr": "%{v}", "en": "{v}%", "ru": "{v}%"},
 
 	# --- Title ---
-	"game.title": {"tr": "AKDENİZ'İN NABZI", "en": "PULSE OF THE MEDITERRANEAN", "ru": "ПУЛЬС СРЕДИЗЕМНОМОРЬЯ"},
+	"game.title": {"tr": "AQUASTASIS", "en": "AQUASTASIS", "ru": "AQUASTASIS"},
 	"game.subtitle": {
-		"tr": "COP31 Antalya — Tersine Pandemi",
-		"en": "COP31 Antalya — The Reverse Pandemic",
-		"ru": "COP31 Анталья — Пандемия наоборот",
+		"tr": "COP31 Antalya — Akdeniz Ekosistem Savunması",
+		"en": "COP31 Antalya — Mediterranean Ecosystem Defense",
+		"ru": "COP31 Анталья — Защита экосистемы Средиземноморья",
 	},
 
 	# --- Main menu ---

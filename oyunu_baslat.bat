@@ -1,5 +1,5 @@
 @echo off
-title Pulse of the Mediterranean
+title Aquastasis
 setlocal
 cd /d "%~dp0"
 
@@ -25,7 +25,7 @@ if not exist "%GODOT_EXE%" (
     exit /b 1
 )
 
-echo Pulse of the Mediterranean baslatiliyor...
+echo Aquastasis baslatiliyor...
 echo.
 
 "%GODOT_EXE%" --path "%PROJ_DIR%"

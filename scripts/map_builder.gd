@@ -832,6 +832,7 @@ func _make_label(font_size: int, color: Color) -> Label3D:
 func _connect_bus() -> void:
 	EventBus.region_changed.connect(_on_region_changed)
 	EventBus.spread_happened.connect(_on_spread_happened)
+	EventBus.evolution_happened.connect(_on_evolution_happened)
 	EventBus.toast.connect(_on_toast)
 	EventBus.action_performed.connect(_on_action_performed)
 	EventBus.region_selected.connect(_on_region_selected)
@@ -1570,7 +1571,13 @@ func _on_spread_happened(from_id: String, to_id: String) -> void:
 		var dst: RegionView = _views[to_id]
 		dst.flash = 1.0
 	if to_id == RegionData.HERO_ID:
-		shake(0.2)
+		shake(0.35)
+	else:
+		shake(0.18)
+
+
+func _on_evolution_happened(_evo_id: String) -> void:
+	shake(0.85)
 
 
 func _on_toast(_text_key: String, _args: Dictionary, severity: int) -> void:

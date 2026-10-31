@@ -28,6 +28,7 @@ func _ready() -> void:
 
 ## Starts a fresh game. p_seed < 0 picks a random seed (logged for reproducibility).
 func new_game(p_seed: int = -1) -> void:
+	Engine.time_scale = 1.0
 	game_seed = p_seed if p_seed >= 0 else randi()
 	print("GameState: new game, seed ", game_seed)
 	sim = CrisisSim.new(game_seed)
@@ -49,6 +50,7 @@ func stop_game() -> void:
 
 
 func set_speed(index: int) -> void:
+	Engine.time_scale = 1.0
 	speed_index = clampi(index, 0, Balance.SPEEDS.size() - 1)
 	if speed_index > 0:
 		_last_speed = speed_index
@@ -85,7 +87,17 @@ func is_paused() -> bool:
 	return speed_index == 0 or not _pause_reasons.is_empty() or not running
 
 
+## Sub-tick accumulator progress 0..1 for the live HUD tick progress bar.
+func tick_progress() -> float:
+	if sim == null or not running:
+		return 0.0
+	return clampf(_accumulator / maxf(Balance.TICK_SECONDS, 0.001), 0.0, 1.0)
+
+
 func _process(delta: float) -> void:
+	if _pause_reasons.has("event") and (sim == null or sim.pending_event.is_empty()):
+		_pause_reasons.erase("event")
+		EventBus.paused_changed.emit(is_paused())
 	if sim == null or not running or not _pause_reasons.is_empty():
 		return
 	var speed: float = Balance.SPEEDS[speed_index]
@@ -218,6 +230,42 @@ func active_evolutions() -> Array:
 	if sim == null:
 		return []
 	return sim.active_evolutions()
+
+
+func can_synthesize_counter(evo_id: String) -> bool:
+	return sim != null and running and not has_pause_reason("event") and sim.can_synthesize_counter(evo_id)
+
+
+func synthesize_counter(evo_id: String) -> bool:
+	if not can_synthesize_counter(evo_id):
+		return false
+	var res: Dictionary = sim.synthesize_counter(evo_id)
+	if not bool(res.get("ok", false)):
+		return false
+	_publish_result(res)
+	_publish_all()
+	return true
+
+
+func can_perform_project(project_id: String) -> bool:
+	return sim != null and running and not has_pause_reason("event") and sim.can_perform_project(project_id)
+
+
+func project_cooldown_left_ticks(project_id: String) -> int:
+	if sim == null:
+		return 0
+	return sim.project_cooldown_left_ticks(project_id)
+
+
+func perform_project(project_id: String) -> bool:
+	if not can_perform_project(project_id):
+		return false
+	var res: Dictionary = sim.perform_project(project_id)
+	if not bool(res.get("ok", false)):
+		return false
+	_publish_result(res)
+	_publish_all()
+	return true
 
 
 ## {"shares": {branch: 0..1}, "threshold": float, "moves": int, "min_moves": int} - how close

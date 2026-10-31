@@ -55,6 +55,7 @@ func _ready() -> void:
 	menu.quit_requested.connect(_quit)
 	EventBus.game_over.connect(_on_game_over)
 	EventBus.tree_toggle_requested.connect(_toggle_tree)
+	EventBus.event_triggered.connect(_on_event_triggered)
 
 	var args: PackedStringArray = OS.get_cmdline_user_args()
 	if args.has("--autostart"):
@@ -140,6 +141,11 @@ func _toggle_tree() -> void:
 		tree_ui.toggle()
 
 
+func _on_event_triggered(_event_id: String) -> void:
+	if tree_ui.is_open():
+		tree_ui.close()
+
+
 ## True while nothing modal covers the game (menus, event card, policy tree).
 func _gameplay_input() -> bool:
 	return GameState.running and not menu.is_open() and not event_card.is_open() and not tree_ui.is_open()
@@ -149,7 +155,8 @@ func _unhandled_input(event: InputEvent) -> void:
 	var key := event as InputEventKey
 	if key == null or not key.pressed or key.echo:
 		return
-	match key.keycode:
+	var code: int = key.keycode if key.keycode != 0 else key.physical_keycode
+	match code:
 		KEY_ESCAPE:
 			if not GameState.running or event_card.is_open():
 				return
@@ -164,18 +171,18 @@ func _unhandled_input(event: InputEvent) -> void:
 		KEY_SPACE:
 			if _gameplay_input():
 				GameState.toggle_pause()
-		KEY_1:
+		KEY_1, KEY_KP_1:
 			if _gameplay_input():
 				GameState.set_speed(1)
-		KEY_2:
+		KEY_2, KEY_KP_2:
 			if _gameplay_input():
 				GameState.set_speed(2)
-		KEY_3:
+		KEY_3, KEY_KP_3, KEY_4, KEY_KP_4:
 			if _gameplay_input():
 				GameState.set_speed(3)
 		KEY_Q, KEY_W, KEY_E:
 			if _gameplay_input() and GameState.selected_region != "":
-				var action_id: String = Balance.ACTION_ORDER[int(ACTION_KEYS[key.keycode])]
+				var action_id: String = Balance.ACTION_ORDER[int(ACTION_KEYS[code])]
 				GameState.perform_action(action_id, GameState.selected_region)
 		_:
 			return

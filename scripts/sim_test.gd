@@ -38,7 +38,7 @@ func _init() -> void:
 
 func _run() -> void:
 	print("")
-	print("=== PULSE OF THE MEDITERRANEAN - simulation balance test (Phase 2) ===")
+	print("=== AQUASTASIS - simulation balance test (Phase 2) ===")
 	print("Full game: %d ticks x %.1f s = %.0f s at 1x (%d -> %d)" % [
 		B.TOTAL_TICKS, B.TICK_SECONDS, float(B.TOTAL_TICKS) * B.TICK_SECONDS / float(B.SPEEDS[1]),
 		B.START_YEAR, B.END_YEAR])

@@ -70,7 +70,7 @@ var _right_panel: PanelContainer
 var _toast_box: VBoxContainer
 var _tip_panel: PanelContainer
 var _tip_title: Label
-var _tip_body: Label
+var _tip_body: RichTextLabel
 var _tip_meta: Label
 var _tip_owner: Control = null
 var _tip_tween: Tween = null
@@ -80,8 +80,12 @@ var _tip_side: String = "left"
 var _pulse: Charts
 var _year_label: Label
 var _years_left_label: Label
+var _tick_bar: ProgressBar
+var _tick_bar_fill: StyleBoxFlat
 var _timeline: Charts
 var _speed_buttons: Array = []
+var _speed_icons: Array = []
+var _speed_labels: Array = []
 var _paused_chip: PanelContainer
 var _chip_on: bool = false          # chip keeps its layout slot; only its alpha changes
 var _res_labels: Dictionary = {}    # key -> value Label
@@ -101,6 +105,10 @@ var _hint_box: HBoxContainer
 var _hint_icon: Icons
 var _details: VBoxContainer
 var _region_name: Label
+var _region_trait_box: PanelContainer
+var _region_trait_label: Label
+var _bd_box: PanelContainer
+var _bd_labels: Dictionary = {}
 var _badge: PanelContainer
 var _badge_label: Label
 var _region_crisis_bar: Charts
@@ -143,16 +151,47 @@ var _tree_status: Label
 var _tree_open: bool = false
 var _adoptable: int = 0
 
+# Visual Juice & Screen Vignette
+var _vignette: Control
+var _vignette_alpha: float = 0.0
+var _vignette_color: Color = UITheme.CRISIS
+var _vignette_tween: Tween = null
+var _floating_layer: Control
+
+# 60-Second Onboarding Briefing
+var _onboarding_box: PanelContainer
+var _onboarding_timer_label: Label
+var _onboarding_done_label: Label
+var _onboarding_steps: Array = []       # [ { "icon": Icons, "label": Label, "key": String }, ... ]
+var _onboard_steps_done: Array = [false, false, false, false]
+var _onboard_time_left: float = 60.0
+var _onboard_active: bool = false
+
+# Tactical Briefing Modal
+var _briefing_modal: Control
+var _briefing_step: int = 1
+var _briefing_step_label: Label
+var _briefing_card_icon: Icons
+var _briefing_card_title: Label
+var _briefing_card_text: RichTextLabel
+var _briefing_prev_btn: Button
+var _briefing_next_btn: Button
+var _briefing_skip_btn: Button
+
 
 func _ready() -> void:
 	set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	mouse_filter = Control.MOUSE_FILTER_IGNORE
 	theme = UITheme.build_theme()
+	_build_vignette()
+	_build_floating_layer()
 	_build_ticker_strip()
 	_build_top_bar()
 	_build_left_panel()
 	_build_right_panel()
 	_build_toasts()
+	_build_onboarding()
+	_build_tactical_briefing()
 	_build_tip()
 	visible = false
 
@@ -170,6 +209,8 @@ func _ready() -> void:
 	EventBus.evolution_cured.connect(_on_evolution_cured)
 	EventBus.node_adopted.connect(_on_node_adopted)
 	EventBus.tree_toggled.connect(_on_tree_toggled)
+	EventBus.spread_happened.connect(_on_spread_happened)
+	EventBus.bubble_collected.connect(_on_bubble_collected)
 
 	_select_region(GameState.selected_region)
 	_on_speed_changed(GameState.speed_index)
@@ -198,6 +239,13 @@ func _icon(id: String, col: Color, px: float) -> Icons:
 	ic.setup(id, col, px)
 	ic.size_flags_vertical = Control.SIZE_SHRINK_CENTER
 	return ic
+
+
+func _spacer() -> Control:
+	var s := Control.new()
+	s.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	s.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	return s
 
 
 func _hbox(sep: int = 8) -> HBoxContainer:
@@ -330,14 +378,35 @@ func _build_top_bar() -> void:
 	row.add_child(_vline(40.0))
 
 	# Year block.
-	var year_box := _vbox(0)
+	var year_box := _vbox(2)
 	year_box.custom_minimum_size = Vector2(170.0, 0.0)
 	year_box.alignment = BoxContainer.ALIGNMENT_CENTER
 	row.add_child(year_box)
 	_year_label = _label("BigValueLabel")
-	_year_label.add_theme_font_size_override("font_size", 22)
+	_year_label.add_theme_font_size_override("font_size", 20)
 	_ellipsis(_year_label)
 	year_box.add_child(_year_label)
+	_tick_bar = ProgressBar.new()
+	_tick_bar.custom_minimum_size = Vector2(154.0, 5.0)
+	_tick_bar.min_value = 0.0
+	_tick_bar.max_value = 1.0
+	_tick_bar.step = 0.0
+	_tick_bar.value = 0.0
+	_tick_bar.show_percentage = false
+	_tick_bar.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	var tb_bg: StyleBoxFlat = UITheme.panel_box(UITheme.LINE_DIM, UITheme.with_alpha(UITheme.DEEP, 0.9), 1, Color(0, 0, 0, 0), 0, 2)
+	tb_bg.content_margin_left = 0.0
+	tb_bg.content_margin_right = 0.0
+	tb_bg.content_margin_top = 0.0
+	tb_bg.content_margin_bottom = 0.0
+	_tick_bar_fill = UITheme.panel_box(UITheme.HEALTHY, UITheme.with_alpha(UITheme.HEALTHY, 0.85), 0, UITheme.with_alpha(UITheme.HEALTHY, 0.35), 4, 2)
+	_tick_bar_fill.content_margin_left = 0.0
+	_tick_bar_fill.content_margin_right = 0.0
+	_tick_bar_fill.content_margin_top = 0.0
+	_tick_bar_fill.content_margin_bottom = 0.0
+	_tick_bar.add_theme_stylebox_override("background", tb_bg)
+	_tick_bar.add_theme_stylebox_override("fill", _tick_bar_fill)
+	year_box.add_child(_tick_bar)
 	_years_left_label = _label("DimLabel")
 	_ellipsis(_years_left_label)
 	year_box.add_child(_years_left_label)
@@ -355,6 +424,8 @@ func _build_top_bar() -> void:
 		var btn := Button.new()
 		btn.theme_type_variation = &"SpeedButton"
 		btn.toggle_mode = true
+		btn.mouse_filter = Control.MOUSE_FILTER_STOP
+		btn.mouse_default_cursor_shape = Control.CURSOR_POINTING_HAND
 		btn.custom_minimum_size = Vector2(58.0, 38.0)
 		btn.size_flags_vertical = Control.SIZE_SHRINK_CENTER
 		_wire_button(btn)
@@ -362,18 +433,27 @@ func _build_top_bar() -> void:
 		btn.mouse_exited.connect(_hide_tip.bind(btn))
 		btn.pressed.connect(_on_speed_pressed.bind(i))
 		var inner := _hbox(4)
+		inner.mouse_filter = Control.MOUSE_FILTER_IGNORE
 		inner.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 		inner.alignment = BoxContainer.ALIGNMENT_CENTER
 		btn.add_child(inner)
 		var px: float = 16.0 if i == 0 else 14.0
-		inner.add_child(_icon(SPEED_ICONS[i], UITheme.TEXT, px))
+		var ic: Icons = _icon(SPEED_ICONS[i], UITheme.TEXT, px)
+		ic.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		inner.add_child(ic)
+		_speed_icons.append(ic)
 		var txt: String = SPEED_TEXT[i]
+		var spd_label: Label = null
 		if txt != "":
 			var l := _label("SmallLabel")
+			l.mouse_filter = Control.MOUSE_FILTER_IGNORE
 			l.text = txt
+			l.add_theme_font_override("font", UITheme.mono_bold_font())
 			l.add_theme_font_size_override("font_size", 13)
 			l.size_flags_vertical = Control.SIZE_SHRINK_CENTER
 			inner.add_child(l)
+			spd_label = l
+		_speed_labels.append(spd_label)
 		speed_row.add_child(btn)
 		_speed_buttons.append(btn)
 	_paused_chip = PanelContainer.new()
@@ -686,6 +766,21 @@ func _build_right_panel() -> void:
 	_region_name.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	_region_name.custom_minimum_size = Vector2(280.0, 0.0)
 	_details.add_child(_region_name)
+
+	_region_trait_box = PanelContainer.new()
+	_region_trait_box.theme_type_variation = &"BadgePanel"
+	_region_trait_box.add_theme_stylebox_override("panel", UITheme.badge_box(UITheme.WARNING))
+	_region_trait_box.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_region_trait_box.visible = false
+	_details.add_child(_region_trait_box)
+	var trait_row := _hbox(6)
+	_region_trait_box.add_child(trait_row)
+	trait_row.add_child(_icon("alert", UITheme.WARNING, 14.0))
+	_region_trait_label = _label("BadgeLabel")
+	_region_trait_label.add_theme_color_override("font_color", UITheme.WARNING.lerp(Color.WHITE, 0.25))
+	_ellipsis(_region_trait_label)
+	trait_row.add_child(_region_trait_label)
+
 	_region_crisis_bar = _stat_block(_details, "crisis", "hud.region.crisis", "inverse", UITheme.CRISIS, 14.0)
 	var inset := _panel("InsetPanel")
 	inset.mouse_filter = Control.MOUSE_FILTER_IGNORE
@@ -712,6 +807,47 @@ func _build_right_panel() -> void:
 	_coastal_value = _label("SmallLabel")
 	_coastal_value.add_theme_color_override("font_color", UITheme.TEXT_DIM)
 	cp.add_child(_coastal_value)
+
+	# Monthly Dynamics Breakdown
+	_bd_box = _panel("InsetPanel")
+	_bd_box.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_bd_box.visible = false
+	_details.add_child(_bd_box)
+	var bd_col := _vbox(3)
+	_bd_box.add_child(bd_col)
+	var bd_head := _hbox(6)
+	bd_col.add_child(bd_head)
+	bd_head.add_child(_icon("trend_down", UITheme.AMBER, 14.0))
+	var bd_title := _label("HeaderLabel", "hud.breakdown.title")
+	bd_title.add_theme_font_size_override("font_size", 10)
+	bd_title.add_theme_color_override("font_color", UITheme.AMBER.lerp(Color.WHITE, 0.2))
+	bd_head.add_child(bd_title)
+
+	var bd_items := [
+		["shipping", "hud.breakdown.shipping", UITheme.CRISIS],
+		["currents", "hud.breakdown.currents", UITheme.WARNING],
+		["coastal", "hud.breakdown.coastal", UITheme.WARNING],
+		["heat", "hud.breakdown.heat", UITheme.CRISIS],
+		["shield", "hud.breakdown.shield", UITheme.HEALTHY],
+		["net", "hud.breakdown.net", UITheme.TEXT],
+	]
+	for item in bd_items:
+		var k: String = item[0]
+		var name_key: String = item[1]
+		var col_hint: Color = item[2]
+		var row := _hbox(4)
+		bd_col.add_child(row)
+		var lbl := _label("DimLabel", name_key)
+		lbl.add_theme_font_size_override("font_size", 10)
+		lbl.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		_ellipsis(lbl)
+		row.add_child(lbl)
+		var val_l := _label("SmallLabel")
+		val_l.add_theme_font_override("font", UITheme.mono_bold_font())
+		val_l.add_theme_font_size_override("font_size", 10)
+		val_l.add_theme_color_override("font_color", col_hint)
+		row.add_child(val_l)
+		_bd_labels[k] = val_l
 
 	col.add_child(_sep())
 	var ops_head := _hbox(8)
@@ -962,11 +1098,385 @@ func _guard_toasts() -> void:
 	_layout_toasts()
 
 
+# --- Visual Juice: screen vignette & floating feedback ------------------------------------
+
+func _build_vignette() -> void:
+	_vignette = Control.new()
+	_vignette.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	_vignette.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_vignette.draw.connect(_draw_vignette)
+	add_child(_vignette)
+
+
+func _draw_vignette() -> void:
+	if _vignette_alpha <= 0.005:
+		return
+	var vp: Vector2 = get_viewport_rect().size
+	var w: float = vp.x
+	var h: float = vp.y
+	var d: float = 200.0
+	var col := Color(_vignette_color.r, _vignette_color.g, _vignette_color.b, _vignette_alpha)
+	var trans := Color(_vignette_color.r, _vignette_color.g, _vignette_color.b, 0.0)
+
+	_vignette.draw_polygon(
+		PackedVector2Array([Vector2(0.0, 0.0), Vector2(w, 0.0), Vector2(w, d), Vector2(0.0, d)]),
+		PackedColorArray([col, col, trans, trans])
+	)
+	_vignette.draw_polygon(
+		PackedVector2Array([Vector2(0.0, h), Vector2(w, h), Vector2(w, h - d), Vector2(0.0, h - d)]),
+		PackedColorArray([col, col, trans, trans])
+	)
+	_vignette.draw_polygon(
+		PackedVector2Array([Vector2(0.0, 0.0), Vector2(d, 0.0), Vector2(d, h), Vector2(0.0, h)]),
+		PackedColorArray([col, trans, trans, col])
+	)
+	_vignette.draw_polygon(
+		PackedVector2Array([Vector2(w, 0.0), Vector2(w - d, 0.0), Vector2(w - d, h), Vector2(w, h)]),
+		PackedColorArray([col, trans, trans, col])
+	)
+
+
+func _flash_vignette(col: Color, peak: float = 0.45, duration: float = 1.0) -> void:
+	if _vignette == null:
+		return
+	_vignette_color = col
+	_vignette_alpha = peak
+	_vignette.queue_redraw()
+	if _vignette_tween != null and _vignette_tween.is_valid():
+		_vignette_tween.kill()
+	_vignette_tween = create_tween()
+	_vignette_tween.set_trans(Tween.TRANS_QUAD)
+	_vignette_tween.set_ease(Tween.EASE_OUT)
+	_vignette_tween.tween_property(self, "_vignette_alpha", 0.0, duration)
+
+
+func _build_floating_layer() -> void:
+	_floating_layer = Control.new()
+	_floating_layer.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	_floating_layer.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_floating_layer.z_index = 8
+	add_child(_floating_layer)
+
+
+func _spawn_floating_text(text: String, col: Color, global_pos: Vector2, rise: float = 36.0, duration: float = 1.1) -> void:
+	if not is_instance_valid(_floating_layer):
+		return
+	var l := Label.new()
+	l.text = text
+	l.add_theme_font_override("font", UITheme.mono_bold_font())
+	l.add_theme_font_size_override("font_size", 16)
+	l.add_theme_color_override("font_color", col)
+	l.add_theme_color_override("font_shadow_color", Color(0.0, 0.0, 0.0, 0.85))
+	l.add_theme_constant_override("shadow_offset_x", 1)
+	l.add_theme_constant_override("shadow_offset_y", 1)
+	l.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	l.global_position = global_pos
+	_floating_layer.add_child(l)
+	var tw := l.create_tween()
+	tw.set_parallel(true)
+	tw.set_trans(Tween.TRANS_QUAD)
+	tw.set_ease(Tween.EASE_OUT)
+	tw.tween_property(l, "global_position:y", global_pos.y - rise, duration)
+	tw.tween_property(l, "modulate:a", 0.0, duration).set_ease(Tween.EASE_IN)
+	tw.chain().tween_callback(l.queue_free)
+
+
+# --- 60-Second Onboarding Briefing --------------------------------------------------------
+
+func _build_onboarding() -> void:
+	_onboarding_box = PanelContainer.new()
+	_onboarding_box.theme_type_variation = &"HudPanel"
+	_onboarding_box.custom_minimum_size = Vector2(360.0, 0.0)
+	_onboarding_box.position = Vector2(MARGIN + LEFT_W + 24.0, PANEL_Y)
+	_onboarding_box.visible = false
+	add_child(_onboarding_box)
+
+	var col := _vbox(6)
+	_onboarding_box.add_child(col)
+
+	var head := _hbox(8)
+	col.add_child(head)
+	head.add_child(_icon("crosshair", UITheme.AMBER, 16.0))
+	var title_l := _label("HeaderLabel", "onboarding.title")
+	title_l.add_theme_color_override("font_color", UITheme.AMBER)
+	title_l.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	head.add_child(title_l)
+
+	_onboarding_timer_label = _label("SmallLabel")
+	_onboarding_timer_label.add_theme_font_override("font", UITheme.mono_bold_font())
+	_onboarding_timer_label.add_theme_color_override("font_color", UITheme.TEXT_DIM)
+	_onboarding_timer_label.text = "60s"
+	head.add_child(_onboarding_timer_label)
+
+	var dismiss_btn := Button.new()
+	dismiss_btn.theme_type_variation = &"ChipButton"
+	dismiss_btn.text = "✕"
+	dismiss_btn.custom_minimum_size = Vector2(22.0, 22.0)
+	dismiss_btn.focus_mode = Control.FOCUS_NONE
+	dismiss_btn.pressed.connect(_dismiss_onboarding)
+	head.add_child(dismiss_btn)
+
+	col.add_child(_sep())
+
+	_onboarding_steps.clear()
+	var step_keys := [
+		"onboarding.step1",
+		"onboarding.step2",
+		"onboarding.step3",
+		"onboarding.step4",
+	]
+	for k in step_keys:
+		var key: String = k
+		var row := _hbox(8)
+		col.add_child(row)
+		var ic := _icon("target", UITheme.TEXT_DIM, 14.0)
+		row.add_child(ic)
+		var sl := _label("BodyLabel", key)
+		sl.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+		sl.custom_minimum_size = Vector2(300.0, 0.0)
+		row.add_child(sl)
+		_onboarding_steps.append({"icon": ic, "label": sl, "key": key})
+
+	_onboarding_done_label = _label("HeaderLabel", "onboarding.done")
+	_onboarding_done_label.add_theme_color_override("font_color", UITheme.HEALTHY)
+	_onboarding_done_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	_onboarding_done_label.visible = false
+	col.add_child(_onboarding_done_label)
+
+
+func _start_onboarding() -> void:
+	_onboard_active = true
+	_onboard_time_left = 60.0
+	_onboard_steps_done = [false, false, false, false]
+	if _onboarding_box != null:
+		_onboarding_box.visible = true
+		_onboarding_box.modulate.a = 1.0
+	if _onboarding_done_label != null:
+		_onboarding_done_label.visible = false
+	_update_onboarding_ui()
+
+
+func _dismiss_onboarding() -> void:
+	if not _onboard_active:
+		return
+	_onboard_active = false
+	if _onboarding_box != null:
+		var tw := create_tween()
+		tw.tween_property(_onboarding_box, "modulate:a", 0.0, 0.4)
+		tw.tween_callback(func() -> void:
+			if _onboarding_box != null:
+				_onboarding_box.visible = false
+		)
+
+
+func _complete_onboarding_step(idx: int) -> void:
+	if not _onboard_active or idx < 0 or idx >= _onboard_steps_done.size():
+		return
+	if bool(_onboard_steps_done[idx]):
+		return
+	_onboard_steps_done[idx] = true
+	_update_onboarding_ui()
+
+	var all_done: bool = true
+	for s in _onboard_steps_done:
+		if not bool(s):
+			all_done = false
+			break
+	if all_done:
+		_on_all_onboarding_done()
+
+
+func _update_onboarding_ui() -> void:
+	for i in range(mini(_onboarding_steps.size(), _onboard_steps_done.size())):
+		var d: Dictionary = _onboarding_steps[i]
+		var done: bool = bool(_onboard_steps_done[i])
+		var ic: Icons = d["icon"]
+		var lb: Label = d["label"]
+		if done:
+			ic.set_icon("check", UITheme.HEALTHY, 14.0)
+			lb.add_theme_color_override("font_color", UITheme.HEALTHY)
+		else:
+			ic.set_icon("target", UITheme.TEXT_DIM, 14.0)
+			lb.add_theme_color_override("font_color", UITheme.TEXT)
+
+
+func _on_all_onboarding_done() -> void:
+	if _onboarding_done_label != null:
+		_onboarding_done_label.visible = true
+	_flash_vignette(UITheme.HEALTHY, 0.35, 1.0)
+	var tw := create_tween()
+	tw.tween_interval(2.5)
+	tw.tween_property(_onboarding_box, "modulate:a", 0.0, 0.5)
+	tw.tween_callback(func() -> void:
+		_onboard_active = false
+		if _onboarding_box != null:
+			_onboarding_box.visible = false
+	)
+
+
+# --- 3-Card Tactical Briefing Modal -----------------------------------------------------
+
+func _build_tactical_briefing() -> void:
+	_briefing_modal = Control.new()
+	_briefing_modal.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	_briefing_modal.mouse_filter = Control.MOUSE_FILTER_STOP
+	_briefing_modal.visible = false
+	_briefing_modal.z_index = 25
+	add_child(_briefing_modal)
+
+	var backdrop := ColorRect.new()
+	backdrop.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	backdrop.color = Color(0.02, 0.03, 0.06, 0.84)
+	backdrop.mouse_filter = Control.MOUSE_FILTER_STOP
+	_briefing_modal.add_child(backdrop)
+
+	var card := PanelContainer.new()
+	card.custom_minimum_size = Vector2(740.0, 480.0)
+	card.mouse_filter = Control.MOUSE_FILTER_STOP
+	var sb: StyleBoxFlat = UITheme.panel_box(UITheme.LINE_AMBER, UITheme.with_alpha(UITheme.BG_PANEL, 0.98), 2, UITheme.with_alpha(UITheme.AMBER, 0.2), 24, 16)
+	sb.content_margin_left = 32.0
+	sb.content_margin_right = 32.0
+	sb.content_margin_top = 28.0
+	sb.content_margin_bottom = 28.0
+	card.add_theme_stylebox_override("panel", sb)
+	card.set_anchors_preset(Control.PRESET_CENTER)
+	card.anchor_left = 0.5
+	card.anchor_top = 0.5
+	card.anchor_right = 0.5
+	card.anchor_bottom = 0.5
+	card.offset_left = -370.0
+	card.offset_top = -240.0
+	card.offset_right = 370.0
+	card.offset_bottom = 240.0
+	_briefing_modal.add_child(card)
+
+	var col := _vbox(16)
+	card.add_child(col)
+
+	var top := _hbox(12)
+	col.add_child(top)
+	var badge := PanelContainer.new()
+	badge.add_theme_stylebox_override("panel", UITheme.badge_box(UITheme.AMBER))
+	var badge_lbl := _label("BadgeLabel", "briefing.modal_title")
+	badge.add_child(badge_lbl)
+	top.add_child(badge)
+	top.add_child(_spacer())
+	_briefing_step_label = _label("SmallLabel")
+	_briefing_step_label.add_theme_font_override("font", UITheme.mono_bold_font())
+	_briefing_step_label.add_theme_color_override("font_color", UITheme.TEXT_DIM)
+	top.add_child(_briefing_step_label)
+
+	col.add_child(_sep())
+
+	var content_box := _vbox(12)
+	content_box.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	col.add_child(content_box)
+
+	var card_head := _hbox(12)
+	content_box.add_child(card_head)
+	_briefing_card_icon = _icon("sea_health", UITheme.AMBER, 32.0)
+	card_head.add_child(_briefing_card_icon)
+	_briefing_card_title = _label("HeaderLabel")
+	_briefing_card_title.add_theme_font_size_override("font_size", 18)
+	_briefing_card_title.add_theme_color_override("font_color", UITheme.AMBER.lerp(Color.WHITE, 0.25))
+	card_head.add_child(_briefing_card_title)
+
+	_briefing_card_text = RichTextLabel.new()
+	_briefing_card_text.bbcode_enabled = true
+	_briefing_card_text.fit_content = false
+	_briefing_card_text.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	_briefing_card_text.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	_briefing_card_text.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_briefing_card_text.add_theme_font_override("normal_font", UITheme.body_font())
+	_briefing_card_text.add_theme_font_override("bold_font", UITheme.mono_bold_font())
+	_briefing_card_text.add_theme_font_size_override("normal_font_size", 15)
+	_briefing_card_text.add_theme_font_size_override("bold_font_size", 15)
+	_briefing_card_text.add_theme_color_override("default_color", UITheme.TEXT)
+	content_box.add_child(_briefing_card_text)
+
+	col.add_child(_sep())
+
+	var btm := _hbox(12)
+	col.add_child(btm)
+	_briefing_skip_btn = Button.new()
+	_briefing_skip_btn.theme_type_variation = &"ChipButton"
+	_briefing_skip_btn.text = I18n.t("briefing.btn.skip")
+	_briefing_skip_btn.mouse_default_cursor_shape = Control.CURSOR_POINTING_HAND
+	_briefing_skip_btn.pressed.connect(_close_briefing)
+	btm.add_child(_briefing_skip_btn)
+	btm.add_child(_spacer())
+
+	_briefing_prev_btn = Button.new()
+	_briefing_prev_btn.theme_type_variation = &"SecondaryButton"
+	_briefing_prev_btn.custom_minimum_size = Vector2(100.0, 36.0)
+	_briefing_prev_btn.text = I18n.t("briefing.btn.prev")
+	_briefing_prev_btn.mouse_default_cursor_shape = Control.CURSOR_POINTING_HAND
+	_briefing_prev_btn.pressed.connect(_on_briefing_prev)
+	btm.add_child(_briefing_prev_btn)
+
+	_briefing_next_btn = Button.new()
+	_briefing_next_btn.theme_type_variation = &"PrimaryButton"
+	_briefing_next_btn.custom_minimum_size = Vector2(140.0, 36.0)
+	_briefing_next_btn.text = I18n.t("briefing.btn.next")
+	_briefing_next_btn.mouse_default_cursor_shape = Control.CURSOR_POINTING_HAND
+	_briefing_next_btn.pressed.connect(_on_briefing_next)
+	btm.add_child(_briefing_next_btn)
+
+
+func _show_tactical_briefing() -> void:
+	_briefing_step = 1
+	_briefing_modal.visible = true
+	GameState.set_pause_reason("briefing", true)
+	_update_briefing_card()
+
+
+func _close_briefing() -> void:
+	_briefing_modal.visible = false
+	GameState.set_pause_reason("briefing", false)
+	_start_onboarding()
+
+
+func _on_briefing_prev() -> void:
+	if _briefing_step > 1:
+		_briefing_step -= 1
+		_update_briefing_card()
+
+
+func _on_briefing_next() -> void:
+	if _briefing_step < 3:
+		_briefing_step += 1
+		_update_briefing_card()
+	else:
+		_close_briefing()
+
+
+func _update_briefing_card() -> void:
+	_briefing_step_label.text = I18n.t("briefing.step_fmt", {"cur": str(_briefing_step), "total": "3"})
+	_briefing_prev_btn.disabled = _briefing_step <= 1
+	if _briefing_step >= 3:
+		_briefing_next_btn.text = I18n.t("briefing.btn.start")
+	else:
+		_briefing_next_btn.text = I18n.t("briefing.btn.next")
+	match _briefing_step:
+		1:
+			_briefing_card_icon.set_icon("sea_health", UITheme.CRISIS, 32.0)
+			_briefing_card_title.text = I18n.t("briefing.card1.title")
+			_briefing_card_text.text = I18n.t("briefing.card1.text")
+		2:
+			_briefing_card_icon.set_icon("budget", UITheme.AMBER, 32.0)
+			_briefing_card_title.text = I18n.t("briefing.card2.title")
+			_briefing_card_text.text = I18n.t("briefing.card2.text")
+		3:
+			_briefing_card_icon.set_icon("tree", UITheme.HEALTHY, 32.0)
+			_briefing_card_title.text = I18n.t("briefing.card3.title")
+			_briefing_card_text.text = I18n.t("briefing.card3.text")
+
+
 func _build_tip() -> void:
 	_tip_panel = PanelContainer.new()
 	_tip_panel.theme_type_variation = &"TipPanel"
 	_tip_panel.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	_tip_panel.custom_minimum_size = Vector2(300.0, 0.0)
+	_tip_panel.custom_minimum_size = Vector2(360.0, 0.0)
 	_tip_panel.visible = false
 	_tip_panel.z_index = 10
 	add_child(_tip_panel)
@@ -974,15 +1484,22 @@ func _build_tip() -> void:
 	_tip_panel.add_child(col)
 	_tip_title = _label("TipTitleLabel")
 	_tip_title.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	_tip_title.custom_minimum_size = Vector2(272.0, 0.0)
+	_tip_title.custom_minimum_size = Vector2(330.0, 0.0)
 	col.add_child(_tip_title)
-	_tip_body = _label("BodyLabel")
-	_tip_body.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	_tip_body.custom_minimum_size = Vector2(272.0, 0.0)
+	_tip_body = RichTextLabel.new()
+	_tip_body.bbcode_enabled = true
+	_tip_body.fit_content = true
+	_tip_body.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_tip_body.custom_minimum_size = Vector2(330.0, 0.0)
+	_tip_body.add_theme_font_override("normal_font", UITheme.body_font())
+	_tip_body.add_theme_font_override("bold_font", UITheme.mono_bold_font())
+	_tip_body.add_theme_font_size_override("normal_font_size", 12)
+	_tip_body.add_theme_font_size_override("bold_font_size", 12)
+	_tip_body.add_theme_color_override("default_color", UITheme.TEXT)
 	col.add_child(_tip_body)
 	_tip_meta = _label("DimLabel")
 	_tip_meta.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	_tip_meta.custom_minimum_size = Vector2(272.0, 0.0)
+	_tip_meta.custom_minimum_size = Vector2(330.0, 0.0)
 	col.add_child(_tip_meta)
 
 
@@ -1065,13 +1582,15 @@ func _on_action_hover(btn: Button, action_id: String) -> void:
 
 
 func _on_res_hover(block: Control, key: String) -> void:
-	var body: String = I18n.t("hud.rate.tip")
+	var title: String = I18n.t(str(RES_KEYS[key]))
+	var tip_k: String = "res.%s.tip" % key
+	var body: String = I18n.t(tip_k) if I18n.has_key(tip_k) else I18n.t("hud.rate.tip")
 	if key == "budget" and _budget_negative:
-		body = I18n.t("hud.rate.tip_negative")
+		body += "\n\n" + I18n.t("hud.rate.tip_negative")
 	var meta: String = ""
 	if _rate_values.has(key):
-		meta = I18n.t("hud.rate", {"v": _signed(float(_rate_values[key]))})
-	_show_tip(block, I18n.t(str(RES_KEYS[key])), body, meta, "below")
+		meta = I18n.t("hud.rate.monthly", {"v": _signed(float(_rate_values[key]))})
+	_show_tip(block, title, body, meta, "below")
 
 
 func _on_tree_hover() -> void:
@@ -1243,6 +1762,7 @@ func _on_game_started() -> void:
 	_pressure_branch = ""
 	_update_pressure()
 	_update_tree_status()
+	_show_tactical_briefing()
 
 
 func _on_tick_done(snapshot: Dictionary) -> void:
@@ -1267,8 +1787,10 @@ func _on_tick_done(snapshot: Dictionary) -> void:
 
 func _update_time_labels() -> void:
 	var y: int = int(_snap.get("year_int", Balance.START_YEAR))
+	var m: int = int(_snap.get("month_int", 1))
 	var left: int = int(_snap.get("years_left", Balance.END_YEAR - Balance.START_YEAR))
-	_year_label.text = I18n.t("hud.year", {"year": str(y)})
+	var m_str: String = "%02d" % m
+	_year_label.text = I18n.t("hud.month_fmt", {"year": str(y), "month": m_str})
 	_years_left_label.text = I18n.t("hud.years_left", {"n": str(left)})
 
 
@@ -1308,10 +1830,9 @@ static func _signed(v: float) -> String:
 	return ("+" if v > 0.0 else "-") + body
 
 
-## Net income per year beside each resource (snapshot *_rate keys; hidden until the
+## Net income per month beside each resource (snapshot *_rate keys; hidden until the
 ## simulation provides them). Negative budget income pulses red and warns once.
 func _update_rates(snap: Dictionary, count_ticks: bool = true) -> void:
-	var tpy: float = _ticks_per_year()
 	for k in RES_ORDER:
 		var key: String = k
 		var rl: Label = _rate_labels[key]
@@ -1320,14 +1841,14 @@ func _update_rates(snap: Dictionary, count_ticks: bool = true) -> void:
 			rl.visible = false
 			_rate_values.erase(key)
 			continue
-		var per_year: float = float(snap[sk]) * tpy
-		_rate_values[key] = per_year
+		var per_month: float = float(snap[sk])
+		_rate_values[key] = per_month
 		rl.visible = true
-		rl.text = I18n.t("hud.rate", {"v": _signed(per_year)})
+		rl.text = "(%s)" % I18n.t("hud.rate.monthly", {"v": _signed(per_month)})
 		var c: Color = UITheme.TEXT_DIM
-		if per_year >= 0.05:
+		if per_month >= 0.05:
 			c = UITheme.HEALTHY.lerp(Color.WHITE, 0.2)
-		elif per_year <= -0.05:
+		elif per_month <= -0.05:
 			c = UITheme.CRISIS.lerp(Color.WHITE, 0.15)
 		rl.add_theme_color_override("font_color", c)
 	var neg: bool = _rate_values.has("budget") and float(_rate_values["budget"]) <= -0.05
@@ -1545,17 +2066,34 @@ func _on_tree_toggled(is_open: bool) -> void:
 func _on_node_adopted(_node_id: String) -> void:
 	_update_tree_status()
 	_update_pressure()
+	_complete_onboarding_step(2)
+	_flash_vignette(UITheme.HEALTHY, 0.40, 1.0)
 
 
 func _on_evolution_happened(_evolution_id: String) -> void:
 	_refresh_resistances(true)
 	_update_pressure()
 	_resist_flash = 1.0
+	_flash_vignette(UITheme.CRISIS, 0.45, 1.2)
 
 
 func _on_evolution_cured(_evolution_id: String) -> void:
 	_refresh_resistances(false)
 	_update_pressure()
+	_flash_vignette(UITheme.HEALTHY, 0.45, 1.2)
+
+
+func _on_spread_happened(_from_id: String, _to_id: String) -> void:
+	_flash_vignette(UITheme.CRISIS, 0.35, 0.8)
+
+
+func _on_bubble_collected(_bubble_id: int, kind: String, amount: float) -> void:
+	_complete_onboarding_step(1)
+	var vs: Vector2 = get_viewport_rect().size
+	var pos := Vector2(vs.x * 0.5 - 40.0, vs.y * 0.45)
+	var col: Color = RES_COLORS.get(kind, UITheme.HEALTHY)
+	var rname: String = I18n.t("hud." + kind) if RES_KEYS.has(kind) else kind.capitalize()
+	_spawn_floating_text("+%d %s" % [roundi(amount), rname], col, pos, 45.0, 1.3)
 
 
 func _on_resources_changed(budget: float, political: float, science: float) -> void:
@@ -1566,10 +2104,15 @@ func _on_resources_changed(budget: float, political: float, science: float) -> v
 		var old: float = _res_target[key]
 		_res_target[key] = nv
 		var l: Label = _res_labels[key]
+		var diff: float = nv - old
 		if nv < old - 0.5:
 			_flash_label(l, UITheme.CRISIS)
+			if absf(diff) >= 1.0:
+				_spawn_floating_text("%d" % roundi(diff), UITheme.CRISIS, l.global_position + Vector2(10.0, 24.0))
 		elif nv > old + 4.0:
 			_flash_label(l, UITheme.HEALTHY)
+			if absf(diff) >= 1.0:
+				_spawn_floating_text("+%d" % roundi(diff), UITheme.HEALTHY, l.global_position + Vector2(10.0, 24.0))
 	_refresh_actions()
 
 
@@ -1585,6 +2128,8 @@ func _on_region_selected(region_id: String) -> void:
 
 func _select_region(region_id: String) -> void:
 	_selected = region_id
+	if region_id != "":
+		_complete_onboarding_step(0)
 	_region = {}
 	if region_id != "":
 		_region = GameState.get_region(region_id)
@@ -1643,6 +2188,34 @@ func _update_region(data: Dictionary, force: bool) -> void:
 		var bar: Charts = _stat_bars[key]
 		bar.set_value(float(data.get(key, 0.0)))
 	_coastal_value.text = I18n.t("fmt.pct", {"v": str(roundi(float(data.get("coastal_pop", 0.0)) * 100.0))})
+
+	var trait_k: String = str(data.get("trait_key", ""))
+	if trait_k != "" and I18n.has_key(trait_k):
+		_region_trait_label.text = I18n.t(trait_k)
+		_region_trait_box.visible = true
+	else:
+		_region_trait_box.visible = false
+
+	var bd: Dictionary = data.get("breakdown", {})
+	if not bd.is_empty():
+		_bd_box.visible = true
+		if _bd_labels.has("shipping"):
+			_bd_labels["shipping"].text = "+%.1f" % float(bd.get("shipping", 0.0))
+		if _bd_labels.has("currents"):
+			_bd_labels["currents"].text = "+%.1f" % float(bd.get("currents", 0.0))
+		if _bd_labels.has("coastal"):
+			_bd_labels["coastal"].text = "+%.1f" % float(bd.get("coastal", 0.0))
+		if _bd_labels.has("heat"):
+			_bd_labels["heat"].text = "+%.1f" % float(bd.get("heat", 0.0))
+		if _bd_labels.has("shield"):
+			_bd_labels["shield"].text = "-%.1f" % float(bd.get("shield", 0.0))
+		if _bd_labels.has("net"):
+			var net_val: float = float(bd.get("net", 0.0))
+			_bd_labels["net"].text = ("+" if net_val >= 0.0 else "") + "%.1f/ay" % net_val
+			var net_col: Color = UITheme.CRISIS if net_val > 0.05 else (UITheme.HEALTHY if net_val < -0.05 else UITheme.TEXT_DIM)
+			_bd_labels["net"].add_theme_color_override("font_color", net_col)
+	else:
+		_bd_box.visible = false
 
 
 func _refresh_actions() -> void:
@@ -1721,6 +2294,10 @@ func _on_action_performed(action_id: String, region_id: String) -> void:
 		btn.self_modulate = Color(0.7, 1.9, 1.7, 1.0)
 		var tw := btn.create_tween()
 		tw.tween_property(btn, "self_modulate", Color.WHITE, 0.6)
+		var bpos: Vector2 = btn.global_position + Vector2(24.0, -8.0)
+		var def: Dictionary = Balance.ACTIONS.get(action_id, {})
+		var act_name: String = I18n.t(str(def.get("name_key", action_id)))
+		_spawn_floating_text(act_name, UITheme.HEALTHY, bpos, 35.0, 1.1)
 	_right_bracket_color = UITheme.HEALTHY
 	_right_panel.queue_redraw()
 
@@ -1733,17 +2310,49 @@ func _on_speed_pressed(index: int) -> void:
 		GameState.toggle_pause()
 	else:
 		GameState.set_speed(index)
+	_on_speed_changed(GameState.speed_index)
 
 
 func _on_speed_changed(speed_index: int) -> void:
 	for i in _speed_buttons.size():
 		var btn: Button = _speed_buttons[i]
-		btn.set_pressed_no_signal(i == speed_index)
+		var active: bool = i == speed_index
+		btn.set_pressed_no_signal(active)
+		var accent: Color = UITheme.WARNING if i == 0 else UITheme.HEALTHY
+		var fg: Color = accent.lerp(Color.WHITE, 0.35) if active else UITheme.TEXT_DIM.lerp(UITheme.TEXT, 0.35)
+		if active:
+			var act_sb: StyleBoxFlat = UITheme.panel_box(accent, UITheme.with_alpha(UITheme.BG_PANEL.lerp(accent, 0.42), 0.96), 2, UITheme.with_alpha(accent, 0.45), 10, 8)
+			act_sb.content_margin_left = 10.0
+			act_sb.content_margin_right = 10.0
+			act_sb.content_margin_top = 6.0
+			act_sb.content_margin_bottom = 6.0
+			btn.add_theme_stylebox_override("normal", act_sb)
+			btn.add_theme_stylebox_override("pressed", act_sb)
+			btn.add_theme_stylebox_override("hover", act_sb)
+			btn.add_theme_stylebox_override("hover_pressed", act_sb)
+		else:
+			btn.remove_theme_stylebox_override("normal")
+			btn.remove_theme_stylebox_override("pressed")
+			btn.remove_theme_stylebox_override("hover")
+			btn.remove_theme_stylebox_override("hover_pressed")
+		if i < _speed_icons.size():
+			var ic: Icons = _speed_icons[i]
+			if ic != null:
+				ic.color = fg
+				ic.queue_redraw()
+		if i < _speed_labels.size():
+			var lbl: Label = _speed_labels[i]
+			if lbl != null:
+				lbl.add_theme_color_override("font_color", fg)
 	_chip_on = speed_index == 0 and GameState.running
+	if speed_index >= 1 and not GameState.is_paused():
+		_complete_onboarding_step(3)
 
 
-func _on_paused_changed(_paused: bool) -> void:
-	_chip_on = GameState.speed_index == 0 and GameState.running
+func _on_paused_changed(paused: bool) -> void:
+	_on_speed_changed(GameState.speed_index)
+	if not paused and GameState.speed_index >= 1:
+		_complete_onboarding_step(3)
 
 
 func _on_language_changed(_lang: String) -> void:
@@ -1792,6 +2401,12 @@ func _process(delta: float) -> void:
 			var l: Label = _res_labels[key]
 			l.text = str(roundi(shown))
 	_ticker_strip.queue_redraw()
+	if _tick_bar != null:
+		_tick_bar.value = GameState.tick_progress()
+		if _tick_bar_fill != null:
+			var tcol: Color = UITheme.WARNING if GameState.is_paused() else UITheme.HEALTHY
+			_tick_bar_fill.bg_color = UITheme.with_alpha(tcol, 0.85)
+			_tick_bar_fill.border_color = tcol
 	_paused_chip.modulate.a = (0.55 + 0.45 * (0.5 + 0.5 * sin(_time * 5.0))) if _chip_on else 0.0
 	_live_dot.modulate.a = 0.35 + 0.65 * (0.5 + 0.5 * sin(_time * 3.0))
 	if _hint_box.visible:
@@ -1806,6 +2421,14 @@ func _process(delta: float) -> void:
 	if _tip_panel.visible:
 		_place_tip()
 	_guard_toasts()
+	if _vignette != null and _vignette_alpha > 0.0:
+		_vignette.queue_redraw()
+	if _onboard_active:
+		_onboard_time_left = maxf(0.0, _onboard_time_left - delta)
+		if _onboarding_timer_label != null:
+			_onboarding_timer_label.text = "%ds" % ceilf(_onboard_time_left)
+		if _onboard_time_left <= 0.0:
+			_dismiss_onboarding()
 	_process_phase2(delta)
 
 

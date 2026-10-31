@@ -82,6 +82,7 @@ var _seen_events: Dictionary = {}        # event id -> tick it was shown
 var _next_event_tick: int = 0            # earliest tick for the next random card
 var _bubbles: Array = []                 # {"id", "kind", "region", "amount", "ttl", "born"}
 var _next_bubble_id: int = 1
+var project_ready_at: Dictionary = {}
 
 
 func _init(p_seed: int = B.DEFAULT_SEED) -> void:
@@ -95,6 +96,7 @@ func reset(p_seed: int) -> void:
 	regions.clear()
 	_links.clear()
 	_band.clear()
+	project_ready_at.clear()
 	for rid in RegionData.IDS:
 		var region_id: String = rid
 		var r: RegionData = RegionData.new(region_id)
@@ -222,7 +224,19 @@ func step() -> Dictionary:
 
 
 func year() -> float:
-	return float(B.START_YEAR) + float(B.END_YEAR - B.START_YEAR) * float(tick) / float(B.TOTAL_TICKS)
+	return float(B.START_YEAR) + float(tick) / 12.0
+
+
+func year_int() -> int:
+	return B.START_YEAR + (tick / 12)
+
+
+func month_int() -> int:
+	return 1 + (tick % 12)
+
+
+func date_str() -> String:
+	return "%d / %02d" % [year_int(), month_int()]
 
 
 ## Sea Health Index 0-100: mean of region health weighted by coastal population.
@@ -267,13 +281,18 @@ func avg_awareness() -> float:
 ## spending (budget_rate / political_rate / science_rate) and a few extra stats.
 func snapshot() -> Dictionary:
 	var y: float = year()
-	var y_int: int = int(floorf(y))
+	var y_int: int = year_int()
+	var m_int: int = month_int()
+	var d_str: String = "%d / %02d" % [y_int, m_int]
 	var rates: Dictionary = income_rates()
 	return {
 		"tick": tick,
 		"year": y,
 		"year_int": y_int,
+		"month_int": m_int,
+		"date_str": d_str,
 		"years_left": maxi(B.END_YEAR - y_int, 0),
+		"months_left": maxi(B.TOTAL_TICKS - tick, 0),
 		"progress": clampf(float(tick) / float(B.TOTAL_TICKS), 0.0, 1.0),
 		"temperature": temperature,
 		"sea_health": sea_health(),
@@ -294,11 +313,129 @@ func snapshot() -> Dictionary:
 	}
 
 
+func pollution_breakdown(region_id: String) -> Dictionary:
+	if not regions.has(region_id):
+		return {}
+	var r: RegionData = _region(region_id)
+	var heat: float = maxf(temperature - B.TEMP_START, 0.0)
+	var shipping_inflow: float = 0.0
+	var current_inflow: float = 0.0
+	for l in _links[region_id]:
+		var link: Dictionary = l
+		var other_id: String = link["id"]
+		var w: float = link["w"]
+		var p: float = _region(other_id).pollution
+		var is_ship: bool = false
+		for rt in RegionData.ROUTES:
+			var route: Dictionary = rt
+			if (route["a"] == region_id and route["b"] == other_id) or (route["b"] == region_id and route["a"] == other_id):
+				if str(route["kind"]) == "shipping":
+					is_ship = true
+				break
+		if is_ship:
+			shipping_inflow += p * w * B.NEIGHBOR_PRESSURE_COEFF * _mul("neighbor_pressure_mult")
+		else:
+			current_inflow += p * w * B.NEIGHBOR_PRESSURE_COEFF * _mul("neighbor_pressure_mult")
+
+	var coastal: float = r.coastal_pop * B.SOURCE_INFLOW_COEFF * _mul("inflow_mult") + B.BASE_POLLUTION_RATE * _mul("base_pollution_mult")
+	var heat_stress: float = heat * B.TEMP_STRESS_COEFF * _mul("heat_stress_mult")
+	var lever_share: float = r.pollution / B.LEVER_POLLUTION_REF
+	var protect_pull: float = r.protection * B.PROTECT_COEFF * _mul("protect_effect_mult") * lever_share
+	var aware_pull: float = r.awareness * B.AWARE_COEFF * _mul("aware_effect_mult") * lever_share
+	var shield_total: float = protect_pull + aware_pull
+	var net: float = (shipping_inflow + current_inflow + coastal + heat_stress) - shield_total
+
+	return {
+		"shipping": shipping_inflow,
+		"currents": current_inflow,
+		"coastal": coastal,
+		"heat": heat_stress,
+		"shield": shield_total,
+		"net": net,
+	}
+
+
 func region_dict(region_id: String) -> Dictionary:
 	if not regions.has(region_id):
 		return {}
 	var r: RegionData = regions[region_id]
-	return r.to_dict()
+	var d: Dictionary = r.to_dict()
+	d["breakdown"] = pollution_breakdown(region_id)
+	d["trait_key"] = "region." + region_id + ".trait"
+	return d
+
+
+func can_synthesize_counter(evo_id: String) -> bool:
+	return _active_evos.has(evo_id) and science >= B.SCIENCE_CURE_COST
+
+
+func synthesize_counter(evo_id: String) -> Dictionary:
+	if not can_synthesize_counter(evo_id):
+		return {"ok": false}
+	science -= B.SCIENCE_CURE_COST
+	_active_evos.erase(evo_id)
+	_immune[evo_id] = true
+	_recompute_mods()
+	var def: Dictionary = TechTree.evolution_def(evo_id)
+	var name_key: String = str(def.get("name_key", evo_id))
+	var toasts: Array = [["sim.toast.cured", {"name": name_key}, 1]]
+	var news: Array = []
+	var news_key: String = str(def.get("cured_news_key", ""))
+	if not news_key.is_empty():
+		news.append([news_key, {}, 1])
+	return {
+		"ok": true,
+		"cured": [evo_id],
+		"toasts": toasts,
+		"news": news
+	}
+
+
+func can_perform_project(project_id: String) -> bool:
+	if over:
+		return false
+	match project_id:
+		"bio_algae":
+			return science >= B.PROJECT_BIO_ALGAE_COST and tick >= int(project_ready_at.get("bio_algae", 0))
+		"drone_swarm":
+			return science >= B.PROJECT_DRONE_SWARM_COST and tick >= int(project_ready_at.get("drone_swarm", 0))
+	return false
+
+
+func project_cooldown_left_ticks(project_id: String) -> int:
+	var ready_tick: int = int(project_ready_at.get(project_id, 0))
+	return maxi(ready_tick - tick, 0)
+
+
+func perform_project(project_id: String) -> Dictionary:
+	if not can_perform_project(project_id):
+		return {"ok": false}
+	match project_id:
+		"bio_algae":
+			science -= B.PROJECT_BIO_ALGAE_COST
+			project_ready_at["bio_algae"] = tick + B.PROJECT_BIO_ALGAE_CD_TICKS
+			temperature = maxf(temperature - 0.08, 1.5)
+			for rid in RegionData.IDS:
+				var r: RegionData = _region(rid)
+				r.seagrass = clampf(r.seagrass + 6.0, 0.0, 100.0)
+			return {"ok": true, "id": "bio_algae", "toasts": [["toast.project.bio_algae", {}, 1]]}
+		"drone_swarm":
+			science -= B.PROJECT_DRONE_SWARM_COST
+			project_ready_at["drone_swarm"] = tick + B.PROJECT_DRONE_SWARM_CD_TICKS
+			var worst_id: String = ""
+			var worst_p: float = -1.0
+			for rid in RegionData.IDS:
+				var r: RegionData = _region(rid)
+				if r.pollution > worst_p:
+					worst_p = r.pollution
+					worst_id = rid
+			if worst_id != "":
+				var r: RegionData = _region(worst_id)
+				r.pollution = maxf(r.pollution - 12.0, 0.0)
+			budget = minf(budget + 30.0, B.RESOURCE_CAP)
+			political = minf(political + 15.0, B.RESOURCE_CAP)
+			return {"ok": true, "id": "drone_swarm", "toasts": [["toast.project.drone_swarm", {}, 1]]}
+	return {"ok": false}
 
 
 func can_afford(action_id: String) -> bool:

@@ -1,13 +1,13 @@
 ; Engine configuration file.
-; Pulse of the Mediterranean - COP31 Antalya hackathon prototype.
+; Aquastasis - COP31 Antalya hackathon prototype.
 ; Autoload order is mandatory: EventBus, Balance, I18n, GameState.
 
 config_version=5
 
 [application]
 
-config/name="Pulse of the Mediterranean"
-config/description="COP31 Antalya - The Reverse Pandemic"
+config/name="Aquastasis"
+config/description="COP31 Antalya - Mediterranean Ecosystem Defense"
 run/main_scene="res://main.tscn"
 config/features=PackedStringArray("4.3", "Forward Plus")
 

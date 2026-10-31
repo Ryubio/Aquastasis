@@ -125,6 +125,14 @@ var _resist_none: Label
 var _resist_more: Label
 var _resist_sig: String = ""
 
+# Repeatable Science Projects
+var _proj_algae_btn: Button
+var _proj_algae_cost: Label
+var _proj_algae_cd: Label
+var _proj_drone_btn: Button
+var _proj_drone_cost: Label
+var _proj_drone_cd: Label
+
 
 func _ready() -> void:
 	set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
@@ -1000,9 +1008,13 @@ func _build_strip() -> void:
 
 	var rx: float = STRIP_LEFT_W + 18.0
 	var rw: float = _strip.size.x - rx - 16.0
+	var resist_w: float = 310.0
+	var proj_x: float = rx + resist_w + 14.0
+	var proj_w: float = rw - resist_w - 14.0
+
 	var rhead := _hbox(10)
 	rhead.position = Vector2(rx, 10.0)
-	rhead.size = Vector2(rw, 24.0)
+	rhead.size = Vector2(resist_w, 24.0)
 	_strip.add_child(rhead)
 	rhead.add_child(_icon("crisis", UITheme.CRISIS, 18.0))
 	var rt := _label("HeaderLabel", "ui.tree.evo.resist_title")
@@ -1013,17 +1025,90 @@ func _build_strip() -> void:
 	rhead.add_child(_resist_more)
 
 	_resist_box = _hbox(12)
-	_resist_box.position = Vector2(rx, 42.0)
-	_resist_box.size = Vector2(rw, 70.0)
+	_resist_box.position = Vector2(rx, 40.0)
+	_resist_box.size = Vector2(resist_w, 74.0)
 	_strip.add_child(_resist_box)
 
 	_resist_none = _label("BodyDimLabel", "ui.tree.evo.none")
-	_resist_none.add_theme_font_size_override("font_size", 14)
+	_resist_none.add_theme_font_size_override("font_size", 13)
 	_resist_none.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	_resist_none.max_lines_visible = 3
-	_resist_none.position = Vector2(rx, 46.0)
-	_resist_none.size = Vector2(rw, 60.0)
+	_resist_none.position = Vector2(rx, 44.0)
+	_resist_none.size = Vector2(resist_w, 60.0)
 	_strip.add_child(_resist_none)
+
+	# Repeatable Science Projects
+	var phead := _hbox(8)
+	phead.position = Vector2(proj_x, 10.0)
+	phead.size = Vector2(proj_w, 24.0)
+	_strip.add_child(phead)
+	phead.add_child(_icon("satellite", SCIENCE_COL, 18.0))
+	var pt := _label("HeaderLabel", "tree.projects.title")
+	pt.add_theme_font_size_override("font_size", 12)
+	pt.add_theme_color_override("font_color", SCIENCE_COL.lerp(Color.WHITE, 0.2))
+	_ellipsis(pt)
+	phead.add_child(pt)
+
+	var proj_col := _vbox(5)
+	proj_col.position = Vector2(proj_x, 38.0)
+	proj_col.size = Vector2(proj_w, 76.0)
+	_strip.add_child(proj_col)
+
+	_proj_algae_btn = Button.new()
+	_proj_algae_btn.custom_minimum_size = Vector2(proj_w, 34.0)
+	_proj_algae_btn.theme_type_variation = &"ChipButton"
+	_proj_algae_btn.mouse_default_cursor_shape = Control.CURSOR_POINTING_HAND
+	_proj_algae_btn.tooltip_text = I18n.t("project.bio_algae.desc")
+	_proj_algae_btn.pressed.connect(_on_bio_algae_pressed)
+	proj_col.add_child(_proj_algae_btn)
+	var a_row := _hbox(6)
+	a_row.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	a_row.offset_left = 6.0
+	a_row.offset_right = -6.0
+	_proj_algae_btn.add_child(a_row)
+	a_row.add_child(_icon("posidonia", SCIENCE_COL, 16.0))
+	var a_title := _label("SmallLabel", "project.bio_algae.name")
+	a_title.add_theme_font_size_override("font_size", 11)
+	a_title.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	_ellipsis(a_title)
+	a_row.add_child(a_title)
+	_proj_algae_cost = _label("SmallLabel")
+	_proj_algae_cost.text = "45 🧪"
+	_proj_algae_cost.add_theme_font_override("font", UITheme.mono_bold_font())
+	_proj_algae_cost.add_theme_font_size_override("font_size", 11)
+	_proj_algae_cost.add_theme_color_override("font_color", SCIENCE_COL)
+	a_row.add_child(_proj_algae_cost)
+	_proj_algae_cd = _label("SmallLabel")
+	_proj_algae_cd.add_theme_font_size_override("font_size", 11)
+	a_row.add_child(_proj_algae_cd)
+
+	_proj_drone_btn = Button.new()
+	_proj_drone_btn.custom_minimum_size = Vector2(proj_w, 34.0)
+	_proj_drone_btn.theme_type_variation = &"ChipButton"
+	_proj_drone_btn.mouse_default_cursor_shape = Control.CURSOR_POINTING_HAND
+	_proj_drone_btn.tooltip_text = I18n.t("project.drone_swarm.desc")
+	_proj_drone_btn.pressed.connect(_on_drone_swarm_pressed)
+	proj_col.add_child(_proj_drone_btn)
+	var d_row := _hbox(6)
+	d_row.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	d_row.offset_left = 6.0
+	d_row.offset_right = -6.0
+	_proj_drone_btn.add_child(d_row)
+	d_row.add_child(_icon("cleanup", SCIENCE_COL, 16.0))
+	var d_title := _label("SmallLabel", "project.drone_swarm.name")
+	d_title.add_theme_font_size_override("font_size", 11)
+	d_title.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	_ellipsis(d_title)
+	d_row.add_child(d_title)
+	_proj_drone_cost = _label("SmallLabel")
+	_proj_drone_cost.text = "35 🧪"
+	_proj_drone_cost.add_theme_font_override("font", UITheme.mono_bold_font())
+	_proj_drone_cost.add_theme_font_size_override("font_size", 11)
+	_proj_drone_cost.add_theme_color_override("font_color", SCIENCE_COL)
+	d_row.add_child(_proj_drone_cost)
+	_proj_drone_cd = _label("SmallLabel")
+	_proj_drone_cd.add_theme_font_size_override("font_size", 11)
+	d_row.add_child(_proj_drone_cd)
 
 
 # --- Refresh ----------------------------------------------------------------------------
@@ -1173,7 +1258,7 @@ func _refresh_details() -> void:
 		else:
 			box.visible = false
 
-	_d_desc.text = I18n.t(str(def.get("desc_key", "")))
+	_d_desc.text = _format_node_details_text(def)
 
 	var counters: Array = def.get("counters", [])
 	var evo_id: String = str(counters[0]) if not counters.is_empty() else ""
@@ -1310,7 +1395,42 @@ func _refresh_strip() -> void:
 	if sig != _resist_sig:
 		_resist_sig = sig
 		_rebuild_resist_chips()
+	_refresh_projects()
 	_strip.queue_redraw()
+
+
+func _refresh_projects() -> void:
+	if _proj_algae_btn == null or _proj_drone_btn == null:
+		return
+	var can_a: bool = GameState.can_perform_project("bio_algae")
+	var cd_a: int = GameState.project_cooldown_left_ticks("bio_algae")
+	_proj_algae_btn.disabled = not can_a
+	if cd_a > 0:
+		_proj_algae_cd.text = I18n.t("tree.projects.cooldown", {"n": str(cd_a)})
+		_proj_algae_cd.add_theme_color_override("font_color", UITheme.WARNING)
+	else:
+		_proj_algae_cd.text = I18n.t("tree.projects.ready")
+		_proj_algae_cd.add_theme_color_override("font_color", UITheme.HEALTHY if can_a else UITheme.ASH)
+
+	var can_d: bool = GameState.can_perform_project("drone_swarm")
+	var cd_d: int = GameState.project_cooldown_left_ticks("drone_swarm")
+	_proj_drone_btn.disabled = not can_d
+	if cd_d > 0:
+		_proj_drone_cd.text = I18n.t("tree.projects.cooldown", {"n": str(cd_d)})
+		_proj_drone_cd.add_theme_color_override("font_color", UITheme.WARNING)
+	else:
+		_proj_drone_cd.text = I18n.t("tree.projects.ready")
+		_proj_drone_cd.add_theme_color_override("font_color", UITheme.HEALTHY if can_d else UITheme.ASH)
+
+
+func _on_bio_algae_pressed() -> void:
+	if GameState.perform_project("bio_algae"):
+		_refresh_all()
+
+
+func _on_drone_swarm_pressed() -> void:
+	if GameState.perform_project("drone_swarm"):
+		_refresh_all()
 
 
 func _rebuild_resist_chips() -> void:
@@ -1353,7 +1473,48 @@ func _resist_chip(evo_id: String) -> PanelContainer:
 	cure.add_child(cl)
 	for nid in TechTree.counters_of(evo_id):
 		cure.add_child(_counter_button(str(nid)))
+
+	var can_synth: bool = GameState.can_synthesize_counter(evo_id)
+	var synth_btn := Button.new()
+	synth_btn.text = I18n.t("tree.counter_synth.btn", {"cost": "30"})
+	synth_btn.theme_type_variation = &"ChipButton"
+	synth_btn.focus_mode = Control.FOCUS_NONE
+	synth_btn.disabled = not can_synth
+	synth_btn.tooltip_text = I18n.t("tree.counter_synth.tip")
+	synth_btn.mouse_default_cursor_shape = Control.CURSOR_POINTING_HAND if can_synth else Control.CURSOR_ARROW
+	synth_btn.pressed.connect(func() -> void:
+		if GameState.synthesize_counter(evo_id):
+			_refresh_all()
+	)
+	cure.add_child(synth_btn)
 	return p
+
+
+func _format_node_details_text(def: Dictionary) -> String:
+	var desc: String = I18n.t(str(def.get("desc_key", "")))
+	var lines := [desc]
+	var bullets: Array = []
+	for eff in def.get("effects", []):
+		var op: String = str(eff.get("op", ""))
+		var val: float = float(eff.get("value", 0.0))
+		match op:
+			"region":
+				var stat: String = str(eff.get("stat", ""))
+				bullets.append("• +%d %s" % [int(val), stat.capitalize()])
+			"mul":
+				var k: String = str(eff.get("key", "")).replace("_mult", "").replace("_", " ")
+				var pct: int = roundi((val - 1.0) * 100.0)
+				var sgn: String = "+" if pct > 0 else ""
+				bullets.append("• %s: %s%d%%" % [k.capitalize(), sgn, pct])
+			"add":
+				var k: String = str(eff.get("key", "")).replace("_", " ")
+				bullets.append("• %s: +%.1f" % [k.capitalize(), val])
+	if not bullets.is_empty():
+		lines.append("")
+		lines.append_array(bullets)
+	if def.get("requires", []).size() > 1:
+		lines.append("• Sinerji / Synergy: Çapraz dal entegrasyonu")
+	return "\n".join(lines)
 
 
 ## Small icon button for a counter policy: hover previews it, click selects it in the tree.

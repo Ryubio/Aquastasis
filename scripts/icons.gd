@@ -48,6 +48,14 @@ func setup(id: String, tint: Color, px: float) -> void:
 	queue_redraw()
 
 
+func set_icon(id: String, tint: Color, px: float = 0.0) -> void:
+	icon_id = id
+	color = tint
+	if px > 0.0:
+		custom_minimum_size = Vector2(px, px)
+	queue_redraw()
+
+
 func set_icon_id(v: String) -> void:
 	icon_id = v
 	queue_redraw()
