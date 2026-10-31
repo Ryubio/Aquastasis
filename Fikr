@@ -1,0 +1,136 @@
+================================================================================
+  AKDENİZ'İN NABZI (PULSE OF THE MEDITERRANEAN) - MASTER FİKİR & GELİŞTİRME RAPORU
+  Etkinlik: GameUP Türkiye Game Hackathon (COP31 Türkiye – Antalya Özel)
+  Tarih / Saat: 31 Ekim 2026 (Güncellenmiş Kapsamlı Sürüm)
+================================================================================
+
+Bu belge, oyunun canlı kod mimarisi, simülasyon dinamikleri, görsel geri bildirimleri 
+ve uluslararası jüri (UNDP & ICPSD) beklentileri doğrultusunda hazırlanmış 
+en kapsamlı fikir, mekanik, atmosfer ve sunum kütüphanesidir.
+
+--------------------------------------------------------------------------------
+1. SON GÜNCELLEME İLE GELENLER VE ANLIK DURUM
+--------------------------------------------------------------------------------
+- TR/EN/RU Çevirileri: i18n.gd dosyasına Türkçe çeviriler tamamen eklendi (96 anahtarın tamamı Türkçe).
+- Başlık Düzeltmesi: Sol üstteki ECG nabız ve marka başlığının taşma/kesilme sorunu giderildi.
+- Büyük Harf Düzeltmesi: Türkçe İ/Ö/Ü/Ğ harflerinin üst noktalarının kırpılması önlendi.
+- Oyun şu anda yerel ekranınızda arka planda en güncel haliyle çalışmaktadır.
+
+--------------------------------------------------------------------------------
+2. KRİTİK EKSİKLİKLER VE TEKNİK DÜZELTMELER
+--------------------------------------------------------------------------------
+
+[2.1] Koddan Üretilen Prosedürel Ses Sistemi (Zero-Asset Audio) - EN BÜYÜK EKSİK
+- Durum: Oyunda hiç ses yok. Harici dosya yasağı olduğu için mp3/wav eklenemiyor.
+- Çözüm: Godot'nun AudioStreamGenerator sınıfıyla KOD İÇİNDEN matematiksel dalgalarla 
+  ses sentezlenmeli:
+  * 1. Ambient Derin Deniz Uğultusu: Düşük frekanslı (40-60 Hz) sinüs dalgası + hafif pembe gürültü.
+  * 2. Radar/Sonar Pusu: 8 saniyede bir hafifçe yankılanan 750 Hz sonar sinyali.
+  * 3. Terminal Buton Tıklaması: 1200 Hz kısa, metalik, tatmin edici dijital klik sesi.
+  * 4. DEFCON Kriz Alarmı: Kriz seviyesi %66'yı aştığında çalan 880/440 Hz iki tonlu acil durum sireni.
+  * 5. Kalp Atışı (Pulse): Deniz sağlığı düştükçe hızlanan ve toklaşan nabız vuruşu.
+
+[2.2] Atıl Kalan Bilim (Science) Kaynağına Anlam Katılması
+- Durum: Atom simgesiyle biriken Bilim puanı şu an hiçbir yerde harcanmıyor.
+- Çözüm: Bilim puanı ile açılan "Araştırma ve İnovasyon" yetenekleri eklenmeli 
+  (Örn: 25 Bilim = "Uydu Tabanlı Kirlilik Takibi", 40 Bilim = "Biyo-Temizleme Enzimleri").
+
+[2.3] Negatif Nakit Akışı (Death Spiral) Görsel Uyarısı
+- Deniz sağlığı %22'nin altına indiğinde bütçe artı kazandırmayı bırakıp para tüketmeye başlar.
+- Bütçe sayacı bu aşamaya girdiğinde kırmızı renkte nabız gibi yanıp sönmeli ve 
+  "Gelir Dengesi Eksiye Düştü!" ikazı çıkmalıdır.
+
+--------------------------------------------------------------------------------
+3. OYNANIŞ (GAMEPLAY) VE YENİ MEKANİK FİKİRLERİ
+--------------------------------------------------------------------------------
+
+[3.1] Mavi Karbon Borsası Mekaniği (Blue Carbon Market)
+- Akdeniz'deki Posidonia deniz çayırları kara ormanlarından 35 kat daha fazla karbon yutar.
+- Mekanik: Posidonia sağlığı %60'ın üzerine çıkarılan her bölge "Karbon Kredisi" üretir.
+  Oyuncu bu kredileri uluslararası piyasada satarak BÜTÇEYE dönüştürebilir. Bu, jürinin 
+  bayılacağı gerçekçi bir çevre ekonomisi modelidir.
+
+[3.2] Rastgele Olay Kartları (Event Decision Cards) - ZİRVE HEYECAN
+- Her 2-3 yılda bir ekranın ortasına inen 2 seçenekli taktiksel brifing kartları:
+  * Olay 1: "Marmara'da Şiddetli Müsilaj Patlaması!"
+    - Seçenek A: Acil Bariyer ve Oksijenleme (-50 Bütçe, Marmara kirliliği %20 düşer).
+    - Seçenek B: Boğaz Geçişlerini Kısıtla (-30 Politika, Bilim kazanılır).
+  * Olay 2: "Yaz Sezonunda Kıyı Turizmi Baskısı (Antalya & Ege)"
+    - Seçenek A: Eko-Turizm ve Plastik Kotası (+Politika, Bölge kirlenmesi durur).
+    - Seçenek B: Serbest Bırak (+100 Bütçe, ancak Posidonia çayırları çöker).
+  * Olay 3: "Akdeniz'de Kaçak Yabancı Troller (Aşırı Avlanma)"
+    - Seçenek A: Deniz Polisi ve Devriye Operasyonu (-20 Politika, Balık stoku korunur).
+    - Seçenek B: Diplomatik Nota Ver (Zaman kaybı, balık stoku %15 düşer).
+
+[3.3] COP31 Acil Durum Zirveleri (Diplomatik Oylama)
+- Simülasyonun 2031, 2036 ve 2041 yıllarında acil COP31 delegasyon toplantısı yapılır:
+  * Eğer deniz sağlığı iyiye gidiyorsa delegeler oyuncuya "Ek Hibe Fonu" (+150 Bütçe) verir.
+  * Eğer ısınma +3.0°C'yi geçtiyse koalisyonda çatlaklar oluşur ve oyuncu politik destek kaybeder.
+
+[3.4] Su Üstünde Beliren Tıklanabilir Baloncuklar (Data Bubbles)
+- Harita üzerinde rastgele aralıklarla su yüzeyine çıkan neon baloncuklar:
+  * Mavi Baloncuk: Tıklandığında +5 Bilim Puanı verir (patlama efektiyle).
+  * Altın Baloncuk: Tıklandığında +10 Bütçe veya +3 Politik Destek verir.
+  * Oyuncu operasyon bekleme sürelerini beklerken haritaya kilitlenir, oyundan kopmaz.
+
+[3.5] Hızlı Klavye Kısayolları (Q, W, E)
+- Bir bölge seçildiğinde:
+  * Q tuşu = Temizlik (Cleanup)
+  * W tuşu = Deniz Devriyesi (Marine Patrol)
+  * E tuşu = Farkındalık Kampanyası (Awareness Campaign)
+  * Space = Oyunu duraklat/devam ettir (Stratejik duraklatma)
+
+[3.6] Antalya Koalisyon Karargahı Özel Yeteneği
+- Antalya sadece bir ışık değil, oyuncunun kalbidir:
+  * Özel Yetenek: "Antalya Araştırma Filosu" -> 3 yılda bir komşu bir bölgeye 
+    (Levant veya Ege) bedelsiz acil müdahale gönderebilme.
+  * Risk: Eğer Antalya Körfezi kriz seviyesi %75'in üzerine çıkarsa, koalisyon dağılır 
+    ve oyun anında kaybedilir ("HQ Fallen").
+
+--------------------------------------------------------------------------------
+4. GÖRSEL (VFX) VE ATMOSFERİK DETAYLAR (LIVING WORLD)
+--------------------------------------------------------------------------------
+
+[4.1] Akdeniz Müsilajı ve Plastik Girdapları (Sea Shader Eklentileri)
+- Marmara'da kirlilik %65'i geçtiğinde, deniz üzerinde köpüklü kirli beyaz bir müsilaj 
+  dokusu yavaşça yayılmalı.
+- İyon ve Ege denizinde kirlilik yüksekken dönen minik plastik atık girdapları (partikül).
+
+[4.2] Nesli Tehlikedeki Türler Canlı Göstergesi (Flagship Species)
+- Akdeniz Foku ve Caretta Caretta deniz kaplumbağaları!
+- Antalya Körfezi ve Ege sağlıklı kaldığı sürece kıyılarda minik yeşil yüzen kaplumbağa 
+  ve fok silüetleri belirmeli; deniz kirlendiğinde bu canlılar haritadan silinmeli. 
+  Bu, duygusal bağı zirveye taşır.
+
+[4.3] DEFCON Alarm Seviyesi Barometresi
+- Ekranın sağ üstünde DEFCON 5 (Yeşil - Normal) ile DEFCON 1 (Kırmızı - Ekolojik Felaket) 
+  arasında geçiş yapan askeri durum göstergesi.
+
+[4.4] Canlı Kayan Haber Bandı (News Ticker)
+- Ekranın en üstünde kesintisiz kayan haberler:
+  * "Antalya kıyılarında deniz kaplumbağası yuvalarında rekor artış."
+  * "Cebelitarık'tan giren mikroplastik akışı İspanya sahillerini vurdu."
+  * "Süveyş Kanalı'ndan giren istilacı türler Levant ekosistemini tehdit ediyor."
+
+[4.5] Kriz Taşıyan Rotalarda Şimşek / Hızlı Zehir Akışı
+- Kriz taşıyan rotalardaki parçacıklar normal rotalara göre iki kat hızlı ve kesik 
+  kırmızı elektrik dalgaları gibi akmalı; tehlike haritada bir bakışta çığlık atmalı.
+
+[4.6] Zafer ve Mağlubiyet Anı Efektleri
+- 2046 Zaferi: Akdeniz'in tüm bölgelerinden parlayan turkuaz bir biyolüminesans şok dalgası.
+- Mağlubiyet: Sanki komuta uydusuyla bağlantı kopmuş gibi ekranın CRT parazitiyle kararması ("SIGNAL LOST").
+
+--------------------------------------------------------------------------------
+5. HACKATHON JÜRİSİNE (UNDP & ICPSD) OYUNU SUNMA STRATEJİSİ
+--------------------------------------------------------------------------------
+
+- Slogan: "Dünyayı yok etmeyi değil, Akdeniz'i kurtarmayı simüle ediyoruz."
+- Bilimsel Dayanak: Akdeniz, dünya okyanuslarının sadece %0.8'ini kaplamasına rağmen 
+  denizel biyoçeşitliliğin %18'ine ev sahipliği yapar ve küresel ısınmadan 
+  dünya ortalamasından %20 daha hızlı etkilenir ("İklim Değişikliği Sıcak Noktası").
+- 3 Dakikalık Kusursuz Jüri Demosu:
+  * 00:00 - 00:30: Açılış, sinematik 3D Akdeniz haritası, Antalya Hero Marker'ı ve DEFCON teması.
+  * 00:30 - 01:15: Marmara ve Levant'tan Antalya'ya sıçrayan kriz dalgası ve acil durum.
+  * 01:15 - 02:15: Stratejik operasyonlar (Temizlik + Devriye + Kampanya) ile krizin kırılması.
+  * 02:15 - 03:00: 2046 yılına başarıyla ulaşılması ve "BASIN RESTORED" zafer ekranı.
+================================================================================
