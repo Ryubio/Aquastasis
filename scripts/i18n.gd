@@ -230,6 +230,12 @@ const STRINGS := {
 		"en": "Budget and political support are both gone. The coalition has dissolved.",
 		"ru": "Не осталось ни бюджета, ни политической поддержки. Коалиция прекратила существование.",
 	},
+	"end.lose.hq.title": {"tr": "ANTALYA KARARGAHI ÇÖKTÜ", "en": "ANTALYA HQ COLLAPSED", "ru": "ШТАБ-КВАРТИРА В АНТАЛЬЕ ПАЛА"},
+	"end.lose.hq.text": {
+		"tr": "Antalya Körfezi ekolojik çöküş sınırını aştı. Koalisyon operasyonel merkezini ve meşruiyetini kaybetti.",
+		"en": "Antalya Gulf crossed the ecological collapse limit. The coalition lost its operational headquarters and legitimacy.",
+		"ru": "Залив Антальи перешел порог экологического коллапса. Коалиция потеряла оперативный штаб и легитимность.",
+	},
 	"end.lose.time.title": {"tr": "SÜRE DOLDU", "en": "TIME RAN OUT", "ru": "ВРЕМЯ ВЫШЛО"},
 	"end.lose.time.text": {
 		"tr": "2046 geldi, havza hâlâ hasta. Deniz Sağlığı: %{health}.",

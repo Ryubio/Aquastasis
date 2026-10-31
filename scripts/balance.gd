@@ -76,13 +76,13 @@ const SPREAD_ROUTE_COOLDOWN_TICKS := 10
 const BUDGET_START := 240.0
 const POLITICAL_START := 75.0
 const SCIENCE_START := 25.0
-const BUDGET_INCOME_PER_TICK := 6.0    # at sea health BUDGET_REF_HEALTH (linear in sea health)
+const BUDGET_INCOME_PER_TICK := 5.5    # at sea health BUDGET_REF_HEALTH (linear in sea health)
 const BUDGET_REF_HEALTH := 50.0
 const BUDGET_BREAKEVEN_HEALTH := 22.0  # below this the sea economy costs money
-const POLITICAL_INCOME_PER_TICK := 1.5  # at average awareness POLITICAL_REF_AWARENESS
+const POLITICAL_INCOME_PER_TICK := 1.4  # at average awareness POLITICAL_REF_AWARENESS
 const POLITICAL_REF_AWARENESS := 25.0
 const POLITICAL_BREAKEVEN_AWARENESS := 8.0  # below this lobbies erode support
-const SCIENCE_INCOME_PER_TICK := 0.40  # monthly science trickle; bubbles and satellites add more
+const SCIENCE_INCOME_PER_TICK := 0.38  # monthly science trickle; bubbles and satellites add more
 const RESOURCE_CAP := 999.0
 const DEPLETED_THRESHOLD := 1.0        # both budget and political below this -> lose
 const DEPLETED_GRACE_TICKS := 5        # ... for this many consecutive ticks
@@ -146,20 +146,22 @@ const CAMPAIGN_NEIGHBOR_SHARE := 0.5
 const BLUE_CARBON_SEAGRASS := 60.0     # "blue_carbon" pays per tick per region with seagrass above this
 const HISTORY_EVERY := 3              # live chart: one sample per this many ticks (every quarter)
 const SCIENCE_CURE_COST := 30.0        # Science Points required to synthesize counter-strategy and cure mutation
-const PROJECT_BIO_ALGAE_COST := 45.0
-const PROJECT_BIO_ALGAE_CD_TICKS := 12  # 30 seconds at 1x
-const PROJECT_DRONE_SWARM_COST := 35.0
-const PROJECT_DRONE_SWARM_CD_TICKS := 10 # 25 seconds at 1x
+const PROJECT_BIO_ALGAE_COST := 40.0   # Science cost
+const PROJECT_BIO_ALGAE_BUDGET := 25.0 # Operational Budget cost
+const PROJECT_BIO_ALGAE_CD_TICKS := 15 # 37.5 seconds at 1x
+const PROJECT_DRONE_SWARM_COST := 30.0 # Science cost
+const PROJECT_DRONE_SWARM_BUDGET := 20.0 # Operational Budget cost
+const PROJECT_DRONE_SWARM_CD_TICKS := 12 # 30 seconds at 1x
 
 # --- Crisis evolution (docs/ARCHITECTURE.md 11.4) ----------------------------
 const EVO_WINDOW := 12                 # the crisis remembers this many recent player moves
 const EVO_MIN_MOVES := 8               # ... and reads a strategy only once it has this many
-const EVO_SHARE := 0.6                 # one branch with at least this share evolves its resistance ...
+const EVO_SHARE := 0.52                # one branch with at least this share evolves its resistance ...
 const EVO_ADAPT_TICKS := 26            # ~65 s at 1x
 const EVO_ADAPT_DECAY := 1.0           # adaptation lost per tick while the strategy is diverse again
 const EVO_WARN_AT := 0.5               # "crisis is adapting" toast at this share of EVO_ADAPT_TICKS
-const EVO_HEAT_TEMP := 2.7             # marine_heatwave evolves at this warming
-const EVO_SPREAD_COUNT := 10           # invasive_species evolves after this many spreads
+const EVO_HEAT_TEMP := 2.50            # marine_heatwave evolves at this warming
+const EVO_SPREAD_COUNT := 8            # invasive_species evolves after this many spreads
 
 # --- Decision events (11.5) -----------------------------------------------------
 const EVENT_FIRST_MIN := 14            # first random card between these ticks (~14-20 months)
@@ -194,3 +196,53 @@ const REGION_START := {
 	"antalya": {"pollution": 24.0, "coral_health": 72.0, "seagrass": 70.0, "fish_stock": 60.0, "awareness": 35.0, "protection": 15.0},
 	"levant": {"pollution": 58.0, "coral_health": 46.0, "seagrass": 42.0, "fish_stock": 36.0, "awareness": 14.0, "protection": 5.0},
 }
+
+# --- Difficulty Levels --------------------------------------------------------
+const DIFFICULTY_CADET := "cadet"
+const DIFFICULTY_COMMANDER := "commander"
+const DIFFICULTY_ADMIRAL := "admiral"
+
+const DIFFICULTIES := {
+	"cadet": {
+		"id": "cadet",
+		"name_key": "diff.cadet.name",
+		"desc_key": "diff.cadet.desc",
+		"badge": "🟢 CADET",
+		"resource_mult": 1.5,
+		"spread_mult": 0.70,
+		"temp_rise_mult": 0.70,
+		"evo_threshold_mult": 1.25,
+		"antalya_collapse_limit": 85.0,
+		"pollution_mult": 0.85
+	},
+	"commander": {
+		"id": "commander",
+		"name_key": "diff.commander.name",
+		"desc_key": "diff.commander.desc",
+		"badge": "🟡 COMMANDER",
+		"resource_mult": 1.0,
+		"spread_mult": 1.0,
+		"temp_rise_mult": 1.0,
+		"evo_threshold_mult": 1.0,
+		"antalya_collapse_limit": 75.0,
+		"pollution_mult": 1.0
+	},
+	"admiral": {
+		"id": "admiral",
+		"name_key": "diff.admiral.name",
+		"desc_key": "diff.admiral.desc",
+		"badge": "🔴 ADMIRAL",
+		"resource_mult": 0.8,
+		"spread_mult": 1.35,
+		"temp_rise_mult": 1.35,
+		"evo_threshold_mult": 0.85,
+		"antalya_collapse_limit": 65.0,
+		"pollution_mult": 1.20
+	}
+}
+
+# --- COP31 Mediterranean Summits (every 5 years: 2031, 2036, 2041) ------------
+const SUMMIT_TICKS := [60, 120, 180]
+
+# --- Antalya Coalition HQ Rule ------------------------------------------------
+const ANTALYA_HQ_COLLAPSE_DEFAULT := 75.0

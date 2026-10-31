@@ -168,6 +168,9 @@ func _unhandled_input(event: InputEvent) -> void:
 				_open_pause()
 		KEY_T:
 			_toggle_tree()
+		KEY_H:
+			if _gameplay_input():
+				EventBus.tutorial_requested.emit()
 		KEY_SPACE:
 			if _gameplay_input():
 				GameState.toggle_pause()

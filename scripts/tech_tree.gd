@@ -50,7 +50,7 @@ const NODES := [
 	},
 	{
 		"id": "protect_coral", "branch": "protect", "tier": 2, "slot": 1,
-		"cost": {"budget": 20.0, "political": 25.0, "science": 25.0},
+		"cost": {"budget": 25.0, "political": 25.0, "science": 25.0},
 		"requires": ["protect_mpa"], "ramp_ticks": 8,
 		"effects": [
 			{"op": "mul", "key": "coral_recovery_mult", "value": 1.45},
@@ -61,7 +61,7 @@ const NODES := [
 	},
 	{
 		"id": "protect_blue_carbon", "branch": "protect", "tier": 3, "slot": 0,
-		"cost": {"budget": 45.0, "political": 35.0, "science": 30.0},
+		"cost": {"budget": 55.0, "political": 35.0, "science": 35.0},
 		"requires": ["protect_posidonia"], "ramp_ticks": 12,
 		"effects": [
 			{"op": "add", "key": "blue_carbon", "value": 0.8},
@@ -72,7 +72,7 @@ const NODES := [
 	},
 	{
 		"id": "protect_sanctuary", "branch": "protect", "tier": 3, "slot": 1,
-		"cost": {"budget": 35.0, "political": 45.0, "science": 20.0},
+		"cost": {"budget": 45.0, "political": 50.0, "science": 25.0},
 		"requires": ["protect_coral", "source_plastic_ban"], "ramp_ticks": 10,
 		"effects": [
 			{"op": "mul", "key": "political_income_mult", "value": 1.25},
@@ -83,7 +83,7 @@ const NODES := [
 	},
 	{
 		"id": "protect_network", "branch": "protect", "tier": 4, "slot": 1,
-		"cost": {"budget": 95.0, "political": 60.0, "science": 45.0},
+		"cost": {"budget": 110.0, "political": 70.0, "science": 50.0},
 		"requires": ["protect_blue_carbon", "protect_sanctuary"], "ramp_ticks": 16,
 		"effects": [
 			{"op": "add", "key": "protection_floor", "value": 25.0},
@@ -96,7 +96,7 @@ const NODES := [
 	# --- SOURCE CUTTING (budget + science for smart sorting/inspection) ---------------------
 	{
 		"id": "source_plastic_ban", "branch": "source", "tier": 1, "slot": 0,
-		"cost": {"budget": 50.0, "political": 10.0, "science": 0.0},
+		"cost": {"budget": 45.0, "political": 10.0, "science": 0.0},
 		"requires": [], "ramp_ticks": 6,
 		"effects": [
 			{"op": "mul", "key": "inflow_mult", "value": 0.85},
@@ -107,7 +107,7 @@ const NODES := [
 	},
 	{
 		"id": "source_river_filters", "branch": "source", "tier": 2, "slot": 0,
-		"cost": {"budget": 80.0, "political": 0.0, "science": 15.0},
+		"cost": {"budget": 75.0, "political": 0.0, "science": 20.0},
 		"requires": ["source_plastic_ban"], "ramp_ticks": 8,
 		"effects": [
 			{"op": "mul", "key": "inflow_mult", "value": 0.75},
@@ -118,7 +118,7 @@ const NODES := [
 	},
 	{
 		"id": "source_ship_inspection", "branch": "source", "tier": 2, "slot": 1,
-		"cost": {"budget": 65.0, "political": 0.0, "science": 25.0},
+		"cost": {"budget": 60.0, "political": 0.0, "science": 20.0},
 		"requires": ["source_plastic_ban"], "ramp_ticks": 8,
 		"effects": [
 			{"op": "mul", "key": "neighbor_pressure_mult", "value": 0.70},
@@ -129,7 +129,7 @@ const NODES := [
 	},
 	{
 		"id": "source_wastewater", "branch": "source", "tier": 3, "slot": 0,
-		"cost": {"budget": 100.0, "political": 0.0, "science": 35.0},
+		"cost": {"budget": 95.0, "political": 0.0, "science": 40.0},
 		"requires": ["source_river_filters"], "ramp_ticks": 12,
 		"effects": [
 			{"op": "mul", "key": "base_pollution_mult", "value": 0.70},
@@ -140,7 +140,7 @@ const NODES := [
 	},
 	{
 		"id": "source_ghost_nets", "branch": "source", "tier": 3, "slot": 1,
-		"cost": {"budget": 85.0, "political": 15.0, "science": 20.0},
+		"cost": {"budget": 80.0, "political": 20.0, "science": 25.0},
 		"requires": ["source_ship_inspection", "science_citizen"], "ramp_ticks": 10,
 		"effects": [
 			{"op": "region", "stat": "fish_stock", "value": 6.0, "target": "all"},
@@ -151,7 +151,7 @@ const NODES := [
 	},
 	{
 		"id": "source_zero_waste_ports", "branch": "source", "tier": 4, "slot": 1,
-		"cost": {"budget": 150.0, "political": 20.0, "science": 50.0},
+		"cost": {"budget": 160.0, "political": 30.0, "science": 55.0},
 		"requires": ["source_wastewater", "source_ghost_nets"], "ramp_ticks": 16,
 		"effects": [
 			{"op": "mul", "key": "inflow_mult", "value": 0.75},
@@ -186,7 +186,7 @@ const NODES := [
 	},
 	{
 		"id": "science_mucilage", "branch": "science", "tier": 2, "slot": 1,
-		"cost": {"budget": 0.0, "political": 0.0, "science": 30.0},
+		"cost": {"budget": 20.0, "political": 0.0, "science": 30.0},
 		"requires": ["science_satellite"], "ramp_ticks": 6,
 		"effects": [
 			{"op": "region", "stat": "pollution", "value": -15.0, "target": "marmara"},
@@ -197,7 +197,7 @@ const NODES := [
 	},
 	{
 		"id": "science_curriculum", "branch": "science", "tier": 3, "slot": 0,
-		"cost": {"budget": 0.0, "political": 0.0, "science": 50.0},
+		"cost": {"budget": 0.0, "political": 25.0, "science": 55.0},
 		"requires": ["science_citizen"], "ramp_ticks": 12,
 		"effects": [
 			{"op": "add", "key": "awareness_floor", "value": 15.0},
@@ -208,7 +208,7 @@ const NODES := [
 	},
 	{
 		"id": "science_data_hub", "branch": "science", "tier": 3, "slot": 1,
-		"cost": {"budget": 0.0, "political": 0.0, "science": 55.0},
+		"cost": {"budget": 35.0, "political": 0.0, "science": 65.0},
 		"requires": ["science_mucilage"], "ramp_ticks": 10,
 		"effects": [
 			{"op": "add", "key": "science_per_tick", "value": 0.5},
@@ -219,7 +219,7 @@ const NODES := [
 	},
 	{
 		"id": "science_disinfo", "branch": "science", "tier": 4, "slot": 1,
-		"cost": {"budget": 0.0, "political": 0.0, "science": 85.0},
+		"cost": {"budget": 0.0, "political": 35.0, "science": 95.0},
 		"requires": ["science_curriculum", "science_data_hub"], "ramp_ticks": 14,
 		"effects": [
 			{"op": "mul", "key": "aware_effect_mult", "value": 1.35},
@@ -264,7 +264,7 @@ const NODES := [
 	},
 	{
 		"id": "economy_treaty", "branch": "economy", "tier": 3, "slot": 0,
-		"cost": {"budget": 65.0, "political": 40.0, "science": 20.0},
+		"cost": {"budget": 65.0, "political": 45.0, "science": 25.0},
 		"requires": ["economy_tourism", "science_satellite"], "ramp_ticks": 12,
 		"effects": [
 			{"op": "mul", "key": "patrol_power_mult", "value": 1.30},
@@ -275,7 +275,7 @@ const NODES := [
 	},
 	{
 		"id": "economy_bonds", "branch": "economy", "tier": 3, "slot": 1,
-		"cost": {"budget": 80.0, "political": 20.0, "science": 30.0},
+		"cost": {"budget": 85.0, "political": 25.0, "science": 35.0},
 		"requires": ["economy_fishers"], "ramp_ticks": 10,
 		"effects": [
 			{"op": "add", "key": "budget_per_tick", "value": 1.5},
@@ -286,7 +286,7 @@ const NODES := [
 	},
 	{
 		"id": "economy_carbon", "branch": "economy", "tier": 4, "slot": 1,
-		"cost": {"budget": 120.0, "political": 40.0, "science": 45.0},
+		"cost": {"budget": 130.0, "political": 45.0, "science": 50.0},
 		"requires": ["economy_treaty", "economy_bonds"], "ramp_ticks": 16,
 		"effects": [
 			{"op": "mul", "key": "temp_rise_mult", "value": 0.75},

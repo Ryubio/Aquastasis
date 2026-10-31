@@ -23,6 +23,7 @@ const END_KEYS := {
 	"lose_temperature": ["end.lose.temperature.title", "end.lose.temperature.text"],
 	"lose_health": ["end.lose.health.title", "end.lose.health.text"],
 	"lose_resources": ["end.lose.resources.title", "end.lose.resources.text"],
+	"lose_hq": ["end.lose.hq.title", "end.lose.hq.text"],
 	"lose_time": ["end.lose.time.title", "end.lose.time.text"],
 }
 
@@ -46,6 +47,8 @@ var _band_t: float = 1.0
 var _rule: ColorRect
 var _pulse: Charts
 var _clock_label: Label
+var _diff_buttons: Dictionary = {}
+var _diff_desc_label: Label = null
 
 # Pause menu
 var _pause_root: Control
@@ -275,6 +278,36 @@ func _build_main() -> void:
 	brief.custom_minimum_size = Vector2(760.0, 0.0)
 	brief_box.add_child(brief)
 	_main_items.append(brief_box)
+
+	# Difficulty Selection Box
+	var diff_box := _vbox(8)
+	col.add_child(diff_box)
+	var diff_title := _label("DimLabel", "diff.title")
+	diff_title.add_theme_font_size_override("font_size", 14)
+	diff_box.add_child(diff_title)
+
+	var diff_row := _hbox(12)
+	diff_box.add_child(diff_row)
+
+	_diff_buttons.clear()
+	for d_id in ["cadet", "commander", "admiral"]:
+		var d_def: Dictionary = Balance.DIFFICULTIES[d_id]
+		var btn := Button.new()
+		btn.theme_type_variation = &"ChipButton"
+		btn.custom_minimum_size = Vector2(160.0, 38.0)
+		btn.text = d_def["badge"]
+		btn.mouse_default_cursor_shape = Control.CURSOR_POINTING_HAND
+		btn.pressed.connect(_on_diff_selected.bind(d_id))
+		diff_row.add_child(btn)
+		_diff_buttons[d_id] = btn
+
+	_diff_desc_label = _label("SmallLabel")
+	_diff_desc_label.add_theme_color_override("font_color", UITheme.TEXT_DIM)
+	_diff_desc_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	_diff_desc_label.custom_minimum_size = Vector2(540.0, 32.0)
+	diff_box.add_child(_diff_desc_label)
+	_update_diff_selection(GameState.selected_difficulty)
+	_main_items.append(diff_box)
 
 	var gap := Control.new()
 	gap.custom_minimum_size = Vector2(0.0, 12.0)
@@ -589,6 +622,15 @@ func _build_end() -> void:
 func _on_end_panel_draw() -> void:
 	var c: Color = UITheme.HEALTHY if _end_won else UITheme.CRISIS
 	_bracket_draw(_end_panel, UITheme.with_alpha(c, 0.85))
+	if not _end_won:
+		var r := _end_panel.get_rect()
+		var y: float = 0.0
+		while y < r.size.y:
+			_end_panel.draw_line(Vector2(0, y), Vector2(r.size.x, y), Color(1.0, 0.15, 0.15, 0.08), 1.0)
+			y += 4.0
+		# CRT military glitch telemetry bars
+		_end_panel.draw_rect(Rect2(0, 18, r.size.x, 3), Color(1.0, 0.2, 0.2, 0.35))
+		_end_panel.draw_rect(Rect2(0, r.size.y - 24, r.size.x, 3), Color(1.0, 0.2, 0.2, 0.35))
 
 
 func _end_keys() -> Array:
@@ -608,7 +650,10 @@ func _render_end_texts() -> void:
 	# winning-looking "60%" on a 59.7% time-out.
 	var sh_i: int = roundi(sh) if _end_won else floori(sh)
 	var args: Dictionary = {"health": str(sh_i), "year": str(yr)}
-	_end_title.text = I18n.t(str(keys[0]))
+	if _end_won:
+		_end_title.text = I18n.t(str(keys[0]))
+	else:
+		_end_title.text = "[ SIGNAL LOST // TRANSMISSION TERMINATED ]\n" + I18n.t(str(keys[0]))
 	_end_text.text = I18n.t(str(keys[1]), args)
 	var accent: Color = UITheme.HEALTHY if _end_won else UITheme.CRISIS
 	_end_title.add_theme_color_override("font_color", accent.lerp(Color.WHITE, 0.12))
@@ -789,8 +834,28 @@ func _set_title_spacing(v: float) -> void:
 # --- Button handlers --------------------------------------------------------------------------
 
 func _on_start_pressed() -> void:
+	AudioSynth.play_click()
 	if _mode == "main":
 		start_requested.emit()
+
+
+func _on_diff_selected(d_id: String) -> void:
+	GameState.selected_difficulty = d_id
+	AudioSynth.play_click()
+	_update_diff_selection(d_id)
+
+
+func _update_diff_selection(d_id: String) -> void:
+	for k in _diff_buttons.keys():
+		var btn: Button = _diff_buttons[k]
+		if k == d_id:
+			var c: Color = UITheme.HEALTHY if k == "cadet" else (UITheme.AMBER if k == "commander" else UITheme.CRISIS)
+			btn.add_theme_color_override("font_color", c)
+		else:
+			btn.remove_theme_color_override("font_color")
+	if _diff_desc_label != null:
+		var d_def: Dictionary = Balance.DIFFICULTIES.get(d_id, {})
+		_diff_desc_label.text = I18n.t(str(d_def.get("desc_key", "")))
 
 
 func _on_resume_pressed() -> void:
@@ -830,6 +895,7 @@ func _on_language_changed(_lang: String) -> void:
 		var key: String = p[1]
 		b.text = I18n.t(key)
 	_sync_lang_buttons()
+	_update_diff_selection(GameState.selected_difficulty)
 	_title_ctrl.queue_redraw()
 	if _mode == "main":
 		if _title_anim != null and _title_anim.is_valid():

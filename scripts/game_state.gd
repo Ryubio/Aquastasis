@@ -16,10 +16,11 @@ var menu_paused: bool = false      # pause menu is open (kept for Phase 1 caller
 var speed_index: int = 1           # index into Balance.SPEEDS (0 = pause)
 var selected_region: String = ""
 var game_seed: int = 0
+var selected_difficulty: String = "commander"
 
 var _last_speed: int = 1
 var _accumulator: float = 0.0
-var _pause_reasons: Dictionary = {}   # "menu" | "tree" | "event" -> true; any reason pauses time
+var _pause_reasons: Dictionary = {}   # "menu" | "tree" | "event" | "summit" | "tutorial" -> true; any reason pauses time
 
 
 func _ready() -> void:
@@ -27,16 +28,19 @@ func _ready() -> void:
 
 
 ## Starts a fresh game. p_seed < 0 picks a random seed (logged for reproducibility).
-func new_game(p_seed: int = -1) -> void:
+func new_game(p_seed: int = -1, p_difficulty: String = "") -> void:
 	Engine.time_scale = 1.0
 	game_seed = p_seed if p_seed >= 0 else randi()
-	print("GameState: new game, seed ", game_seed)
-	sim = CrisisSim.new(game_seed)
+	if p_difficulty != "":
+		selected_difficulty = p_difficulty
+	print("GameState: new game, seed ", game_seed, " diff: ", selected_difficulty)
+	sim = CrisisSim.new(game_seed, selected_difficulty)
 	running = true
 	menu_paused = false
 	_pause_reasons.clear()
 	_accumulator = 0.0
 	_last_speed = 1
+	EventBus.difficulty_changed.emit(selected_difficulty)
 	EventBus.game_started.emit()
 	_publish_all()
 	EventBus.toast.emit("toast.game_start", {}, 1)
@@ -120,6 +124,8 @@ func _do_tick() -> void:
 	if bool(result.get("game_over", false)):
 		running = false
 		_pause_reasons.clear()
+		AudioSynth.set_siren(false)
+		AudioSynth.set_heartbeat(false)
 		var stats: Dictionary = sim.snapshot()
 		var reason: String = str(result.get("reason", ""))
 		stats["reason"] = reason
@@ -129,6 +135,10 @@ func _do_tick() -> void:
 	if not ev.is_empty():
 		set_pause_reason("event", true)
 		EventBus.event_triggered.emit(str(ev.get("id", "")))
+	var summit: Dictionary = result.get("summit", {})
+	if not summit.is_empty():
+		set_pause_reason("summit", true)
+		EventBus.summit_triggered.emit(summit)
 
 
 # --- Field operations -------------------------------------------------------------------
@@ -172,6 +182,7 @@ func perform_action(action_id: String, region_id: String) -> bool:
 	var result: Dictionary = sim.perform(action_id, region_id)
 	if not bool(result.get("ok", false)):
 		return false
+	AudioSynth.play_click()
 	EventBus.action_performed.emit(action_id, region_id)
 	_publish_result(result)
 	_publish_all()
@@ -211,6 +222,7 @@ func adopt_node(node_id: String) -> bool:
 	var result: Dictionary = sim.adopt(node_id)
 	if not bool(result.get("ok", false)):
 		return false
+	AudioSynth.play_policy_adopt()
 	EventBus.node_adopted.emit(node_id)
 	_publish_result(result)
 	_publish_all()
@@ -242,6 +254,7 @@ func synthesize_counter(evo_id: String) -> bool:
 	var res: Dictionary = sim.synthesize_counter(evo_id)
 	if not bool(res.get("ok", false)):
 		return false
+	AudioSynth.play_cured()
 	_publish_result(res)
 	_publish_all()
 	return true
@@ -328,9 +341,33 @@ func collect_bubble(bubble_id: int) -> bool:
 	var result: Dictionary = sim.collect_bubble(bubble_id)
 	if not bool(result.get("ok", false)):
 		return false
-	EventBus.bubble_collected.emit(bubble_id, str(result.get("kind", "")), float(result.get("amount", 0.0)))
+	var b_kind: String = str(result.get("kind", ""))
+	AudioSynth.play_bubble(b_kind == "science")
+	EventBus.bubble_collected.emit(bubble_id, b_kind, float(result.get("amount", 0.0)))
 	var snap: Dictionary = get_snapshot()
 	EventBus.resources_changed.emit(float(snap.get("budget", 0.0)), float(snap.get("political", 0.0)), float(snap.get("science", 0.0)))
+	return true
+
+
+# --- COP31 Summits -------------------------------------------------------------------
+
+func current_summit() -> Dictionary:
+	if sim == null:
+		return {}
+	return sim.pending_summit.duplicate(true)
+
+
+func resolve_summit(choice_idx: int) -> bool:
+	if sim == null or not running:
+		return false
+	var res: Dictionary = sim.resolve_summit(choice_idx)
+	if not bool(res.get("ok", false)):
+		return false
+	set_pause_reason("summit", false)
+	EventBus.summit_resolved.emit(choice_idx)
+	_publish_result(res)
+	_publish_all()
+	AudioSynth.play_policy_adopt()
 	return true
 
 
@@ -367,12 +404,18 @@ func get_history() -> Array:
 # --- Publishing -----------------------------------------------------------------------
 
 func _publish_all() -> void:
+	if sim == null:
+		return
 	for rid in RegionData.IDS:
 		var region_id: String = rid
 		EventBus.region_changed.emit(region_id, sim.region_dict(region_id))
 	var snap: Dictionary = get_snapshot()
 	EventBus.resources_changed.emit(float(snap.get("budget", 0.0)), float(snap.get("political", 0.0)), float(snap.get("science", 0.0)))
 	EventBus.tick_done.emit(snap)
+	if running:
+		var defcon: int = sim.defcon_level()
+		AudioSynth.set_siren(defcon <= 1)
+		AudioSynth.set_heartbeat(sim.sea_health() < 30.0)
 
 
 ## Re-emits every list of a sim step / perform / adopt / resolve result.

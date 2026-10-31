@@ -17,6 +17,7 @@ EventBus="*res://scripts/event_bus.gd"
 Balance="*res://scripts/balance.gd"
 I18n="*res://scripts/i18n.gd"
 GameState="*res://scripts/game_state.gd"
+AudioSynth="*res://scripts/audio_synth.gd"
 
 [display]
 

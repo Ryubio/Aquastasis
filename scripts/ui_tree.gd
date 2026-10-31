@@ -1073,7 +1073,7 @@ func _build_strip() -> void:
 	_ellipsis(a_title)
 	a_row.add_child(a_title)
 	_proj_algae_cost = _label("SmallLabel")
-	_proj_algae_cost.text = "45 🧪"
+	_proj_algae_cost.text = "40🧪 25💰"
 	_proj_algae_cost.add_theme_font_override("font", UITheme.mono_bold_font())
 	_proj_algae_cost.add_theme_font_size_override("font_size", 11)
 	_proj_algae_cost.add_theme_color_override("font_color", SCIENCE_COL)
@@ -1101,7 +1101,7 @@ func _build_strip() -> void:
 	_ellipsis(d_title)
 	d_row.add_child(d_title)
 	_proj_drone_cost = _label("SmallLabel")
-	_proj_drone_cost.text = "35 🧪"
+	_proj_drone_cost.text = "30🧪 20💰"
 	_proj_drone_cost.add_theme_font_override("font", UITheme.mono_bold_font())
 	_proj_drone_cost.add_theme_font_size_override("font_size", 11)
 	_proj_drone_cost.add_theme_color_override("font_color", SCIENCE_COL)
