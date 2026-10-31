@@ -22,7 +22,7 @@ const TOAST_AREA_H := 280.0
 const MAX_TOASTS := 4
 const TOAST_LIFE := 7.0
 
-const RES_BLOCK_W := 186.0
+const RES_BLOCK_W := 115.0
 const RES_ORDER := ["budget", "political", "science"]
 const RES_KEYS := {"budget": "hud.budget", "political": "hud.political", "science": "hud.science"}
 ## Snapshot keys of the net income per tick (before spending) of each resource.
@@ -180,7 +180,9 @@ var _antalya_hq_label: Label
 var _diff_badge: PanelContainer
 var _diff_badge_label: Label
 var _audio_btn: Button
+var _audio_icon: Icons
 var _help_btn: Button
+var _help_icon: Icons
 
 # COP31 Summit Modal
 var _summit_modal: Control
@@ -385,15 +387,15 @@ func _build_top_bar() -> void:
 	_top_bar.offset_top = TICKER_H
 	_top_bar.offset_bottom = TICKER_H + TOP_H
 	add_child(_top_bar)
-	var row := _hbox(16)
+	var row := _hbox(8)
 	_top_bar.add_child(row)
 
 	# Brand: ECG pulse + title.
-	var brand := _hbox(10)
-	brand.custom_minimum_size = Vector2(400.0, 0.0)
+	var brand := _hbox(8)
+	brand.custom_minimum_size = Vector2(170.0, 0.0)
 	row.add_child(brand)
 	_pulse = Charts.new()
-	_pulse.setup_pulse(Vector2(84.0, 36.0))
+	_pulse.setup_pulse(Vector2(56.0, 32.0))
 	_pulse.size_flags_vertical = Control.SIZE_SHRINK_CENTER
 	brand.add_child(_pulse)
 	var brand_text := _vbox(0)
@@ -401,26 +403,26 @@ func _build_top_bar() -> void:
 	brand_text.alignment = BoxContainer.ALIGNMENT_CENTER
 	brand.add_child(brand_text)
 	var title := _label("HeaderLabel", "game.title")
-	title.add_theme_font_size_override("font_size", 13)
+	title.add_theme_font_size_override("font_size", 12)
 	_ellipsis(title)
 	brand_text.add_child(title)
 	var sub := _label("DimLabel", "game.subtitle")
-	sub.add_theme_font_size_override("font_size", 11)
+	sub.add_theme_font_size_override("font_size", 10)
 	_ellipsis(sub)
 	brand_text.add_child(sub)
-	row.add_child(_vline(40.0))
+	row.add_child(_vline(36.0))
 
 	# Year block.
 	var year_box := _vbox(2)
-	year_box.custom_minimum_size = Vector2(170.0, 0.0)
+	year_box.custom_minimum_size = Vector2(96.0, 0.0)
 	year_box.alignment = BoxContainer.ALIGNMENT_CENTER
 	row.add_child(year_box)
 	_year_label = _label("BigValueLabel")
-	_year_label.add_theme_font_size_override("font_size", 20)
+	_year_label.add_theme_font_size_override("font_size", 17)
 	_ellipsis(_year_label)
 	year_box.add_child(_year_label)
 	_tick_bar = ProgressBar.new()
-	_tick_bar.custom_minimum_size = Vector2(154.0, 5.0)
+	_tick_bar.custom_minimum_size = Vector2(90.0, 4.0)
 	_tick_bar.min_value = 0.0
 	_tick_bar.max_value = 1.0
 	_tick_bar.step = 0.0
@@ -445,13 +447,13 @@ func _build_top_bar() -> void:
 	year_box.add_child(_years_left_label)
 
 	_timeline = Charts.new()
-	_timeline.setup_timeline(44.0)
+	_timeline.setup_timeline(34.0)
 	_timeline.size_flags_vertical = Control.SIZE_SHRINK_CENTER
 	row.add_child(_timeline)
-	row.add_child(_vline(40.0))
+	row.add_child(_vline(36.0))
 
 	# Speed controls.
-	var speed_row := _hbox(6)
+	var speed_row := _hbox(4)
 	row.add_child(speed_row)
 	for i in 4:
 		var btn := Button.new()
@@ -459,7 +461,7 @@ func _build_top_bar() -> void:
 		btn.toggle_mode = true
 		btn.mouse_filter = Control.MOUSE_FILTER_STOP
 		btn.mouse_default_cursor_shape = Control.CURSOR_POINTING_HAND
-		btn.custom_minimum_size = Vector2(58.0, 38.0)
+		btn.custom_minimum_size = Vector2(34.0, 30.0)
 		btn.size_flags_vertical = Control.SIZE_SHRINK_CENTER
 		_wire_button(btn)
 		btn.mouse_entered.connect(_on_speed_hover.bind(btn, i))
@@ -470,7 +472,7 @@ func _build_top_bar() -> void:
 		inner.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 		inner.alignment = BoxContainer.ALIGNMENT_CENTER
 		btn.add_child(inner)
-		var px: float = 16.0 if i == 0 else 14.0
+		var px: float = 14.0 if i == 0 else 12.0
 		var ic: Icons = _icon(SPEED_ICONS[i], UITheme.TEXT, px)
 		ic.mouse_filter = Control.MOUSE_FILTER_IGNORE
 		inner.add_child(ic)
@@ -482,7 +484,7 @@ func _build_top_bar() -> void:
 			l.mouse_filter = Control.MOUSE_FILTER_IGNORE
 			l.text = txt
 			l.add_theme_font_override("font", UITheme.mono_bold_font())
-			l.add_theme_font_size_override("font_size", 13)
+			l.add_theme_font_size_override("font_size", 11)
 			l.size_flags_vertical = Control.SIZE_SHRINK_CENTER
 			inner.add_child(l)
 			spd_label = l
@@ -501,50 +503,51 @@ func _build_top_bar() -> void:
 	# timeline and slide the speed buttons out from under the cursor on every pause.
 	_paused_chip.modulate.a = 0.0
 	speed_row.add_child(_paused_chip)
-	row.add_child(_vline(40.0))
+	row.add_child(_vline(36.0))
 
 	# Resources: icon, tick-up value, net income per year, name. Hover explains the rate.
 	for k in RES_ORDER:
 		var key: String = k
 		var col: Color = RES_COLORS[key]
-		var block := _hbox(8)
+		var block := _hbox(6)
 		block.custom_minimum_size = Vector2(RES_BLOCK_W, 0.0)
 		block.mouse_filter = Control.MOUSE_FILTER_PASS
 		block.mouse_entered.connect(_on_res_hover.bind(block, key))
 		block.mouse_exited.connect(_hide_tip.bind(block))
 		row.add_child(block)
-		var res_icon := _icon(key, col, 28.0)
+		var res_icon := _icon(key, col, 22.0)
 		block.add_child(res_icon)
 		_res_icons[key] = res_icon
 		var col_box := _vbox(0)
 		col_box.alignment = BoxContainer.ALIGNMENT_CENTER
 		col_box.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 		block.add_child(col_box)
-		var val_row := _hbox(7)
+		var val_row := _hbox(6)
 		col_box.add_child(val_row)
 		var v := _label("ValueLabel")
 		v.add_theme_color_override("font_color", col.lerp(Color.WHITE, 0.25))
+		v.add_theme_font_size_override("font_size", 13)
 		v.text = "0"
 		val_row.add_child(v)
 		var rate := _label("SmallLabel")
 		rate.add_theme_font_override("font", UITheme.mono_bold_font())
-		rate.add_theme_font_size_override("font_size", 12)
+		rate.add_theme_font_size_override("font_size", 11)
 		rate.size_flags_vertical = Control.SIZE_SHRINK_CENTER
 		rate.visible = false
 		val_row.add_child(rate)
 		_rate_labels[key] = rate
 		var n := _label("DimLabel", RES_KEYS[key])
-		n.add_theme_font_size_override("font_size", 11)
+		n.add_theme_font_size_override("font_size", 10)
 		_ellipsis(n)
 		col_box.add_child(n)
 		_res_labels[key] = v
 		_res_shown[key] = 0.0
 		_res_target[key] = 0.0
 
-	row.add_child(_vline(40.0))
+	row.add_child(_vline(36.0))
 
 	# Flagship Biodiversity (Turtles & Monk Seals)
-	var bio_box := _hbox(10)
+	var bio_box := _hbox(6)
 	bio_box.mouse_filter = Control.MOUSE_FILTER_PASS
 	bio_box.mouse_entered.connect(_on_species_hover.bind(bio_box))
 	bio_box.mouse_exited.connect(_hide_tip.bind(bio_box))
@@ -556,8 +559,8 @@ func _build_top_bar() -> void:
 	_turtle_chip.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	var turtle_inner := _hbox(4)
 	_turtle_chip.add_child(turtle_inner)
-	var t_ico := _label("BadgeLabel")
-	t_ico.text = "🐢"
+	var t_ico: Icons = _icon("turtle", UITheme.HEALTHY, 18.0)
+	t_ico.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	turtle_inner.add_child(t_ico)
 	_turtle_count = _label("SmallLabel")
 	_turtle_count.add_theme_font_override("font", UITheme.mono_bold_font())
@@ -572,8 +575,8 @@ func _build_top_bar() -> void:
 	_seal_chip.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	var seal_inner := _hbox(4)
 	_seal_chip.add_child(seal_inner)
-	var s_ico := _label("BadgeLabel")
-	s_ico.text = "🦭"
+	var s_ico: Icons = _icon("seal", UITheme.SCIENCE_BLUE, 18.0)
+	s_ico.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	seal_inner.add_child(s_ico)
 	_seal_count = _label("SmallLabel")
 	_seal_count.add_theme_font_override("font", UITheme.mono_bold_font())
@@ -582,10 +585,10 @@ func _build_top_bar() -> void:
 	seal_inner.add_child(_seal_count)
 	bio_box.add_child(_seal_chip)
 
-	row.add_child(_vline(40.0))
+	row.add_child(_vline(36.0))
 
 	# Tactical Readiness (DEFCON & Antalya HQ & Difficulty)
-	var tac_box := _hbox(8)
+	var tac_box := _hbox(6)
 	row.add_child(tac_box)
 
 	_defcon_badge = PanelContainer.new()
@@ -620,22 +623,26 @@ func _build_top_bar() -> void:
 	_diff_badge.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	_diff_badge_label = _label("BadgeLabel")
 	_diff_badge_label.add_theme_font_override("font", UITheme.mono_bold_font())
+	_diff_badge_label.add_theme_font_size_override("font_size", 10)
 	_diff_badge_label.add_theme_color_override("font_color", UITheme.TEXT_DIM)
 	_diff_badge_label.text = "COMMANDER"
 	_diff_badge.add_child(_diff_badge_label)
 	tac_box.add_child(_diff_badge)
 
-	row.add_child(_vline(40.0))
+	row.add_child(_vline(36.0))
 
 	# Audio Mute & Help Buttons
-	var util_box := _hbox(6)
+	var util_box := _hbox(4)
 	row.add_child(util_box)
 
 	_audio_btn = Button.new()
 	_audio_btn.theme_type_variation = &"SpeedButton"
-	_audio_btn.custom_minimum_size = Vector2(42.0, 38.0)
+	_audio_btn.custom_minimum_size = Vector2(32.0, 30.0)
 	_audio_btn.mouse_default_cursor_shape = Control.CURSOR_POINTING_HAND
-	_audio_btn.text = "🔊"
+	_audio_icon = _icon("sound_on", UITheme.TEXT, 15.0)
+	_audio_icon.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_audio_icon.set_anchors_and_offsets_preset(Control.PRESET_CENTER)
+	_audio_btn.add_child(_audio_icon)
 	_audio_btn.pressed.connect(_on_audio_toggle)
 	_audio_btn.mouse_entered.connect(_on_audio_hover.bind(_audio_btn))
 	_audio_btn.mouse_exited.connect(_hide_tip.bind(_audio_btn))
@@ -643,9 +650,12 @@ func _build_top_bar() -> void:
 
 	_help_btn = Button.new()
 	_help_btn.theme_type_variation = &"SpeedButton"
-	_help_btn.custom_minimum_size = Vector2(42.0, 38.0)
+	_help_btn.custom_minimum_size = Vector2(32.0, 30.0)
 	_help_btn.mouse_default_cursor_shape = Control.CURSOR_POINTING_HAND
-	_help_btn.text = "❓"
+	_help_icon = _icon("help", UITheme.TEXT, 15.0)
+	_help_icon.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_help_icon.set_anchors_and_offsets_preset(Control.PRESET_CENTER)
+	_help_btn.add_child(_help_icon)
 	_help_btn.pressed.connect(_show_tactical_briefing)
 	_help_btn.mouse_entered.connect(_on_help_hover.bind(_help_btn))
 	_help_btn.mouse_exited.connect(_hide_tip.bind(_help_btn))
@@ -1474,23 +1484,23 @@ func _build_tactical_briefing() -> void:
 	_briefing_modal.add_child(_briefing_backdrop)
 
 	var card := PanelContainer.new()
-	card.custom_minimum_size = Vector2(760.0, 500.0)
+	card.custom_minimum_size = Vector2(700.0, 440.0)
 	card.mouse_filter = Control.MOUSE_FILTER_STOP
 	var sb: StyleBoxFlat = UITheme.panel_box(UITheme.LINE_AMBER, UITheme.with_alpha(UITheme.BG_PANEL, 0.98), 2, UITheme.with_alpha(UITheme.AMBER, 0.2), 24, 16)
 	sb.content_margin_left = 32.0
 	sb.content_margin_right = 32.0
-	sb.content_margin_top = 28.0
-	sb.content_margin_bottom = 28.0
+	sb.content_margin_top = 24.0
+	sb.content_margin_bottom = 24.0
 	card.add_theme_stylebox_override("panel", sb)
 	card.set_anchors_preset(Control.PRESET_CENTER)
 	card.anchor_left = 0.5
 	card.anchor_top = 0.5
 	card.anchor_right = 0.5
 	card.anchor_bottom = 0.5
-	card.offset_left = -380.0
-	card.offset_top = -250.0
-	card.offset_right = 380.0
-	card.offset_bottom = 250.0
+	card.offset_left = -350.0
+	card.offset_top = -220.0
+	card.offset_right = 350.0
+	card.offset_bottom = 220.0
 	_briefing_modal.add_child(card)
 
 	var col := _vbox(16)
@@ -1570,27 +1580,7 @@ func _on_briefing_backdrop_draw() -> void:
 	if _briefing_backdrop == null:
 		return
 	var r := _briefing_backdrop.get_rect()
-	_briefing_backdrop.draw_rect(r, Color(0.02, 0.03, 0.06, 0.82))
-	var spot := Rect2()
-	match _briefing_step:
-		1: spot = Rect2(650, 300, 620, 480)
-		2: spot = Rect2(650, 20, 800, 76)
-		3: spot = Rect2(10, 420, 370, 300)
-		4: spot = Rect2(1640, 950, 260, 90)
-		5: spot = Rect2(1440, 20, 380, 76)
-	if spot.size != Vector2.ZERO:
-		var c := UITheme.with_alpha(UITheme.HEALTHY, 0.85)
-		_briefing_backdrop.draw_rect(spot, UITheme.with_alpha(UITheme.HEALTHY, 0.08))
-		_briefing_backdrop.draw_rect(spot, c, false, 2.0)
-		var blen: float = 16.0
-		_briefing_backdrop.draw_line(spot.position, spot.position + Vector2(blen, 0), c, 3.0)
-		_briefing_backdrop.draw_line(spot.position, spot.position + Vector2(0, blen), c, 3.0)
-		_briefing_backdrop.draw_line(Vector2(spot.end.x, spot.position.y), Vector2(spot.end.x - blen, spot.position.y), c, 3.0)
-		_briefing_backdrop.draw_line(Vector2(spot.end.x, spot.position.y), Vector2(spot.end.x, spot.position.y + blen), c, 3.0)
-		_briefing_backdrop.draw_line(spot.end, spot.end - Vector2(blen, 0), c, 3.0)
-		_briefing_backdrop.draw_line(spot.end, spot.end - Vector2(0, blen), c, 3.0)
-		_briefing_backdrop.draw_line(Vector2(spot.position.x, spot.end.y), Vector2(spot.position.x + blen, spot.end.y), c, 3.0)
-		_briefing_backdrop.draw_line(Vector2(spot.position.x, spot.end.y), Vector2(spot.position.x, spot.end.y - blen), c, 3.0)
+	_briefing_backdrop.draw_rect(r, Color(0.015, 0.025, 0.05, 0.85))
 
 
 func _show_tactical_briefing() -> void:
@@ -1786,7 +1776,7 @@ func _build_summit_modal() -> void:
 func _on_summit_triggered(data: Dictionary) -> void:
 	_current_summit_data = data
 	_summit_modal.visible = true
-	var passed: bool = bool(data.get("passed", true))
+	var passed: bool = bool(data.get("success", data.get("passed", true)))
 	var badge_col: Color = UITheme.HEALTHY if passed else UITheme.AMBER
 	_summit_badge_panel.add_theme_stylebox_override("panel", UITheme.badge_box(badge_col))
 	_summit_badge_label.text = I18n.t("summit.status.success" if passed else "summit.status.warning")
@@ -1794,10 +1784,24 @@ func _on_summit_triggered(data: Dictionary) -> void:
 
 	_summit_title_label.text = I18n.t(str(data.get("title_key", "")))
 	_summit_desc_text.text = I18n.t(str(data.get("desc_key", "")))
-	_summit_opt_a_title.text = I18n.t(str(data.get("opt_a_name", "")))
-	_summit_opt_a_desc.text = I18n.t(str(data.get("opt_a_desc", "")))
-	_summit_opt_b_title.text = I18n.t(str(data.get("opt_b_name", "")))
-	_summit_opt_b_desc.text = I18n.t(str(data.get("opt_b_desc", "")))
+
+	var choices: Array = data.get("choices", [])
+	if choices.size() > 0:
+		var c0: Dictionary = choices[0]
+		_summit_opt_a_title.text = I18n.t(str(c0.get("title_key", "")))
+		_summit_opt_a_desc.text = I18n.t(str(c0.get("desc_key", "")))
+	else:
+		_summit_opt_a_title.text = I18n.t(str(data.get("opt_a_name", "")))
+		_summit_opt_a_desc.text = I18n.t(str(data.get("opt_a_desc", "")))
+
+	if choices.size() > 1:
+		var c1: Dictionary = choices[1]
+		_summit_opt_b_title.text = I18n.t(str(c1.get("title_key", "")))
+		_summit_opt_b_desc.text = I18n.t(str(c1.get("desc_key", "")))
+	else:
+		_summit_opt_b_title.text = I18n.t(str(data.get("opt_b_name", "")))
+		_summit_opt_b_desc.text = I18n.t(str(data.get("opt_b_desc", "")))
+
 	AudioSynth.play_policy_adopt()
 
 
@@ -1868,6 +1872,8 @@ func _place_tip() -> void:
 	var p := Vector2.ZERO
 	if _tip_side == "below":
 		p = Vector2(op.x + osz.x * 0.5 - ts.x * 0.5, op.y + osz.y + 10.0)
+		if _right_panel != null and _right_panel.visible and (p.x + ts.x > _right_panel.position.x):
+			p.x = _right_panel.position.x - ts.x - 14.0
 	elif _tip_side == "under_panel":
 		# Below the REGION panel, clear of the sea regions (east edge ~x 1465 at 1080p).
 		p = Vector2(_right_panel.position.x + (_right_panel.size.x - ts.x) * 0.5, _right_panel.position.y + _right_panel.size.y + 10.0)
@@ -1961,8 +1967,8 @@ func _on_help_hover(block: Control) -> void:
 
 func _on_audio_toggle() -> void:
 	AudioSynth.toggle_mute()
-	if _audio_btn != null:
-		_audio_btn.text = "🔇" if AudioSynth.is_muted else "🔊"
+	if _audio_icon != null:
+		_audio_icon.set_icon("sound_off" if AudioSynth.is_muted else "sound_on", UITheme.TEXT_DIM if AudioSynth.is_muted else UITheme.TEXT, 15.0)
 
 
 func _update_defcon(level: int) -> void:
@@ -2183,8 +2189,8 @@ func _on_game_started() -> void:
 	_update_antalya_hq(100.0, float(_snap.get("antalya_limit", 85.0)))
 	_update_species(int(_snap.get("turtle_nests", 0)), int(_snap.get("monk_seals", 0)))
 	_update_difficulty_badge(str(_snap.get("difficulty", GameState.selected_difficulty)))
-	if _audio_btn != null:
-		_audio_btn.text = "🔇" if AudioSynth.is_muted else "🔊"
+	if _audio_icon != null:
+		_audio_icon.set_icon("sound_off" if AudioSynth.is_muted else "sound_on", UITheme.TEXT_DIM if AudioSynth.is_muted else UITheme.TEXT, 15.0)
 	_show_tactical_briefing()
 
 

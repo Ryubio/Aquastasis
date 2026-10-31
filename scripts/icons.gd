@@ -25,6 +25,8 @@ const IDS := [
 	# Decision events (events.gd EVENTS[].icon)
 	"oil_spill", "heat_alert", "lobby_deal", "greenwash", "fishers_coop", "tourism_surge",
 	"mucilage", "trawler", "caretta", "cop_summit",
+	# System & Biodiversity
+	"turtle", "seal", "sound_on", "sound_off", "help",
 ]
 
 var icon_id: String = "": set = set_icon_id
@@ -268,6 +270,24 @@ func _draw() -> void:
 			_draw_trawler()
 		"caretta":
 			_draw_caretta()
+		"turtle":
+			_turtle_at(Vector2(0.0, 0.04), 1.05, 0.0, 0.28)
+		"seal":
+			_draw_seal()
+		"sound_on":
+			_stroke([Vector2(-0.55, -0.22), Vector2(-0.25, -0.22), Vector2(0.12, -0.52), Vector2(0.12, 0.52), Vector2(-0.25, 0.22), Vector2(-0.55, 0.22)], true, 0.9)
+			_fill([Vector2(-0.55, -0.22), Vector2(-0.25, -0.22), Vector2(0.12, -0.52), Vector2(0.12, 0.52), Vector2(-0.25, 0.22), Vector2(-0.55, 0.22)], 0.35)
+			_arc(Vector2(0.05, 0.0), 0.42, -PI * 0.28, PI * 0.28, 0.8)
+			_arc(Vector2(0.05, 0.0), 0.72, -PI * 0.32, PI * 0.32, 0.8)
+		"sound_off":
+			_stroke([Vector2(-0.55, -0.22), Vector2(-0.25, -0.22), Vector2(0.12, -0.52), Vector2(0.12, 0.52), Vector2(-0.25, 0.22), Vector2(-0.55, 0.22)], true, 0.9)
+			_stroke([Vector2(0.32, -0.32), Vector2(0.72, 0.32)], false, 1.2)
+			_stroke([Vector2(0.72, -0.32), Vector2(0.32, 0.32)], false, 1.2)
+		"help":
+			_ring(Vector2.ZERO, 0.84)
+			_arc(Vector2(0.0, -0.22), 0.26, -PI * 0.9, PI * 0.1, 1.1)
+			_stroke([Vector2(0.14, -0.1), Vector2(0.0, 0.1), Vector2(0.0, 0.26)], false, 1.1)
+			_dot(Vector2(0.0, 0.52), 0.09)
 		"cop_summit":
 			_draw_cop_summit()
 		_:
@@ -1260,6 +1280,21 @@ func _draw_caretta() -> void:
 		_fill(egg, 0.0, UITheme.DEEP)
 		_fill(egg, 0.75)
 		_stroke(egg, true, 0.45)
+
+
+## Mediterranean monk seal (streamlined body, flippers, tail).
+func _draw_seal() -> void:
+	var body: Array = _ellipse(Vector2(-0.06, 0.0), 0.62, 0.35, -0.15, 24)
+	_fill(body, 0.25)
+	_stroke(body, true, 0.9)
+	var tail: Array = [Vector2(0.5, 0.08), Vector2(0.85, -0.16), Vector2(0.76, 0.32)]
+	_fill(tail, 0.4)
+	_stroke(tail, true, 0.7)
+	var flipper: Array = _ellipse(Vector2(-0.08, 0.28), 0.16, 0.32, 0.6, 16)
+	_fill(flipper, 0.45)
+	_stroke(flipper, true, 0.7)
+	_fill(_ellipse(Vector2(-0.64, -0.12), 0.2, 0.18, 0.0, 16), 0.5)
+	_dot(Vector2(-0.68, -0.16), 0.05, 1.0)
 
 
 ## COP31 summits: laurel wreath around the sea.
