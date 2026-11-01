@@ -8,20 +8,28 @@ echo         AQUASTASIS - COP31 ANTALYA ECOSYSTEM DEFENSE
 echo ============================================================
 echo.
 
-:: 1. Check if Aquastasis.exe exists in the current directory
+:: 1. Check if a valid Aquastasis.exe exists in the current directory (> 1MB)
 if exist "%~dp0Aquastasis.exe" (
-    echo [OK] Yerel Aquastasis calistiricisi bulundu.
-    echo Aquastasis baslatiliyor...
-    start "" "%~dp0Aquastasis.exe" --path "%~dp0."
-    exit /b 0
+    for %%F in ("%~dp0Aquastasis.exe") do (
+        if %%~zF GTR 1000000 (
+            echo [OK] Yerel Aquastasis calistiricisi bulundu.
+            echo Aquastasis baslatiliyor...
+            start "" "%~dp0Aquastasis.exe" --path "%~dp0."
+            exit /b 0
+        )
+    )
 )
 
-:: 2. Check if local godot.exe exists
+:: 2. Check if local godot.exe exists (> 1MB)
 if exist "%~dp0godot.exe" (
-    echo [OK] Yerel motor bulundu.
-    echo Aquastasis baslatiliyor...
-    start "" "%~dp0godot.exe" --path "%~dp0."
-    exit /b 0
+    for %%F in ("%~dp0godot.exe") do (
+        if %%~zF GTR 1000000 (
+            echo [OK] Yerel motor bulundu.
+            echo Aquastasis baslatiliyor...
+            start "" "%~dp0godot.exe" --path "%~dp0."
+            exit /b 0
+        )
+    )
 )
 
 :: 3. Check if Godot is available in system PATH
@@ -57,14 +65,18 @@ echo.
 powershell -NoProfile -ExecutionPolicy Bypass -Command "[Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12; $url = 'https://github.com/godotengine/godot/releases/download/4.7.2-stable/Godot_v4.7.2-stable_win64.exe.zip'; $zip = Join-Path $pwd 'godot_temp.zip'; Write-Host 'Motor indiriliyor...'; Invoke-WebRequest -Uri $url -OutFile $zip; Write-Host 'Arsiv aciliyor...'; Expand-Archive -Path $zip -DestinationPath $pwd -Force; Remove-Item $zip; Get-ChildItem -Filter 'Godot_v4*.exe' | Rename-Item -NewName 'Aquastasis.exe'; Write-Host 'Hazir!'"
 
 if exist "%~dp0Aquastasis.exe" (
-    echo.
-    echo ============================================================
-    echo [BASARILI] Aquastasis.exe hazirlandi!
-    echo Oyun baslatiliyor... Bundan sonra dogrudan Aquastasis.exe'ye
-    echo veya bu dosyaya tiklayarak oyunu aninda acabilirsiniz.
-    echo ============================================================
-    start "" "%~dp0Aquastasis.exe" --path "%~dp0."
-    exit /b 0
+    for %%F in ("%~dp0Aquastasis.exe") do (
+        if %%~zF GTR 1000000 (
+            echo.
+            echo ============================================================
+            echo [BASARILI] Aquastasis.exe hazirlandi!
+            echo Oyun baslatiliyor... Bundan sonra dogrudan Aquastasis.exe'ye
+            echo veya bu dosyaya tiklayarak oyunu aninda acabilirsiniz.
+            echo ============================================================
+            start "" "%~dp0Aquastasis.exe" --path "%~dp0."
+            exit /b 0
+        )
+    )
 )
 
 echo.
