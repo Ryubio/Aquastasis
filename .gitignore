@@ -15,5 +15,4 @@ shots/
 
 # Build outputs
 build/
-*.pck
 *.zip
