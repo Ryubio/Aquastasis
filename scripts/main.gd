@@ -34,6 +34,7 @@ func _ready() -> void:
 
 	hud = UIHud.new()
 	hud.name = "HUD"
+	hud.map = map
 	_add_layer("HUDLayer", 2).add_child(hud)
 
 	tree_ui = UITree.new()
@@ -69,6 +70,10 @@ func _ready() -> void:
 				GameState.debug_force_event(arg.trim_prefix("--event="))
 		if args.has("--tree"):
 			tree_ui.open()
+		if args.has("--help-modal"):
+			hud._show_manual()
+		if args.has("--step5"):
+			hud._set_directive_step(5)
 	else:
 		_to_main_menu()
 
@@ -88,7 +93,7 @@ func _start_game() -> void:
 	map.set_menu_mode(false)
 	hud.show_hud()
 	GameState.new_game()
-	GameState.set_speed(1)
+	GameState.set_speed(0)
 
 
 func _to_main_menu() -> void:
@@ -160,7 +165,9 @@ func _unhandled_input(event: InputEvent) -> void:
 		KEY_ESCAPE:
 			if not GameState.running or event_card.is_open():
 				return
-			if tree_ui.is_open():
+			if hud != null and hud.is_manual_open():
+				hud.close_manual()
+			elif tree_ui.is_open():
 				tree_ui.close()
 			elif menu.is_pause_open():
 				_resume()
@@ -173,16 +180,26 @@ func _unhandled_input(event: InputEvent) -> void:
 				EventBus.tutorial_requested.emit()
 		KEY_SPACE:
 			if _gameplay_input():
-				GameState.toggle_pause()
+				if hud != null and hud.is_directive_active() and hud.directive_step() == 5:
+					GameState.set_speed(1)
+					hud.complete_directives()
+				else:
+					GameState.toggle_pause()
 		KEY_1, KEY_KP_1:
 			if _gameplay_input():
 				GameState.set_speed(1)
+				if hud != null and hud.is_directive_active() and hud.directive_step() == 5:
+					hud.complete_directives()
 		KEY_2, KEY_KP_2:
 			if _gameplay_input():
 				GameState.set_speed(2)
+				if hud != null and hud.is_directive_active() and hud.directive_step() == 5:
+					hud.complete_directives()
 		KEY_3, KEY_KP_3, KEY_4, KEY_KP_4:
 			if _gameplay_input():
 				GameState.set_speed(3)
+				if hud != null and hud.is_directive_active() and hud.directive_step() == 5:
+					hud.complete_directives()
 		KEY_Q, KEY_W, KEY_E:
 			if _gameplay_input() and GameState.selected_region != "":
 				var action_id: String = Balance.ACTION_ORDER[int(ACTION_KEYS[code])]

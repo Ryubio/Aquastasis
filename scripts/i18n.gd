@@ -42,6 +42,9 @@ const STRINGS := {
 	},
 	"ui.menu.start": {"tr": "Yeni Oyun", "en": "New Game", "ru": "Новая игра"},
 	"ui.menu.language": {"tr": "Dil", "en": "Language", "ru": "Язык"},
+	"ui.menu.audio": {"tr": "Ses Düzeyi", "en": "Master Volume", "ru": "Громкость звука"},
+	"ui.audio.mute_on": {"tr": "🔇 Sessiz", "en": "🔇 Muted", "ru": "🔇 Без звука"},
+	"ui.audio.mute_off": {"tr": "🔊 Açık", "en": "🔊 Sound On", "ru": "🔊 Звук вкл"},
 	"ui.menu.quit": {"tr": "Çıkış", "en": "Quit", "ru": "Выход"},
 	"ui.menu.event_line": {
 		"tr": "GameUP Türkiye Oyun Hackathonu · COP31 Türkiye – Antalya",
@@ -96,8 +99,8 @@ const STRINGS := {
 	"hud.region.coral": {"tr": "Mercan Sağlığı", "en": "Coral Health", "ru": "Здоровье кораллов"},
 	"hud.region.seagrass": {"tr": "Posidonia Çayırları", "en": "Posidonia Seagrass", "ru": "Луга посидонии"},
 	"hud.region.fish": {"tr": "Balık Stoku", "en": "Fish Stock", "ru": "Рыбные запасы"},
-	"hud.region.awareness": {"tr": "Farkındalık", "en": "Awareness", "ru": "Осведомлённость"},
-	"hud.region.protection": {"tr": "Koruma", "en": "Protection", "ru": "Охрана"},
+	"hud.region.awareness": {"tr": "Halk Bilinci & Destek", "en": "Public Support", "ru": "Поддержка общества"},
+	"hud.region.protection": {"tr": "Deniz Koruma Kalkanı", "en": "Marine Protection", "ru": "Морская охрана"},
 	"hud.region.crisis": {"tr": "Kriz", "en": "Crisis", "ru": "Кризис"},
 	"hud.region.coastal_pop": {
 		"tr": "Kıyı Nüfusu Baskısı",
@@ -128,15 +131,15 @@ const STRINGS := {
 	},
 	"action.patrol.name": {"tr": "Deniz Devriyesi", "en": "Marine Patrol", "ru": "Морской патруль"},
 	"action.patrol.desc": {
-		"tr": "Avlanmaya kapalı alanları denetler, yasa dışı balıkçılığı engeller. Korumayı artırır.",
-		"en": "Enforce no-take zones and stop illegal fishing. Raises protection.",
-		"ru": "Контроль зон запрета лова и пресечение браконьерства. Повышает охрану.",
+		"tr": "Kaçak avlanmayı ve atık deşarjını engeller (-3% kirlilik, +20 koruma kalkanı, yayılmayı önler).",
+		"en": "Intercepts illegal fishing and waste (-3% pollution, +20 protection shield, blocks crisis spread).",
+		"ru": "Пресекает сброс отходов и браконьерство (-3% загрязнения, +20 защиты, блокирует распространение).",
 	},
 	"action.campaign.name": {"tr": "Farkındalık Kampanyası", "en": "Awareness Campaign", "ru": "Просветительская кампания"},
 	"action.campaign.desc": {
-		"tr": "Kıyı halkıyla buluşmalar ve medya çalışmaları. Burada ve komşu bölgelerde farkındalığı artırır.",
-		"en": "Coastal outreach and media. Raises awareness here and in neighbouring regions.",
-		"ru": "Работа с жителями побережья и СМИ. Повышает осведомлённость здесь и в соседних регионах.",
+		"tr": "Halkı kıyı temizliğine seferber eder (-4% kirlilik, +25 halk bilinci, +2.5 siyasi destek).",
+		"en": "Mobilizes coastal cleanups and civic outreach (-4% pollution, +25 awareness, +2.5 political support).",
+		"ru": "Мобилизует гражданские субботники (-4% загрязнения, +25 осведомленности, +2.5 очков поддержки).",
 	},
 
 	# --- Regions and map ---

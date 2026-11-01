@@ -31,9 +31,9 @@ func _init() -> void:
 func _run_suite() -> void:
 	print("")
 	print("================================================================================")
-	print("       AQUASTASIS - 50-GAME MONTE CARLO BALANCE & PLAYABILITY SUITE            ")
+	print("       AQUASTASIS - 80-GAME MONTE CARLO BALANCE & PLAYABILITY SUITE            ")
 	print("================================================================================")
-	print("Running 10 Seeds x 5 Archetypes = 50 Full 20-Year Games (240 ticks / 600s each)")
+	print("Running 10 Seeds x 8 Archetypes = 80 Full 20-Year Games (240 ticks / 600s each)")
 	print("Start Year: %d -> End Year: %d | Base Warming: +%.2f C" % [B.START_YEAR, B.END_YEAR, B.TEMP_START])
 	print("")
 
@@ -91,7 +91,7 @@ func _run_suite() -> void:
 
 	print("")
 	print("================================================================================")
-	print("                     50-GAME AGGREGATE SUMMARY & FINDINGS                       ")
+	print("                     80-GAME AGGREGATE SUMMARY & FINDINGS                       ")
 	print("================================================================================")
 	print("Total Games Completed: %d | Total Wins: %d (%.1f%% overall win rate)" % [
 		total_runs, total_wins, (float(total_wins) / float(total_runs)) * 100.0

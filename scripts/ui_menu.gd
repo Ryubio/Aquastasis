@@ -49,6 +49,10 @@ var _pulse: Charts
 var _clock_label: Label
 var _diff_buttons: Dictionary = {}
 var _diff_desc_label: Label = null
+var _audio_sliders: Array[HSlider] = []
+var _audio_pct_labels: Array[Label] = []
+var _audio_mute_buttons: Array[Button] = []
+var _audio_icons: Array[Icons] = []
 
 # Pause menu
 var _pause_root: Control
@@ -81,6 +85,8 @@ func _ready() -> void:
 	_end_root.visible = false
 	visible = false
 	EventBus.language_changed.connect(_on_language_changed)
+	AudioSynth.volume_changed.connect(func(_v: float) -> void: _sync_audio_controls())
+	AudioSynth.mute_changed.connect(func(_m: bool) -> void: _sync_audio_controls())
 
 
 # --- Builders ----------------------------------------------------------------------------
@@ -196,6 +202,92 @@ func _sync_lang_buttons() -> void:
 		var code: String = p[1]
 		b.set_pressed_no_signal(code == I18n.lang)
 		b.text = I18n.lang_name(code)
+
+
+func _audio_row(parent: Control) -> void:
+	var row := _hbox(10)
+	parent.add_child(row)
+
+	var ic: Icons = _icon("sound_on" if not AudioSynth.is_muted else "sound_off", UITheme.HEALTHY, 20.0)
+	row.add_child(ic)
+	_audio_icons.append(ic)
+
+	var l := _label("DimLabel", "ui.menu.audio")
+	l.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	row.add_child(l)
+
+	var slider := HSlider.new()
+	slider.min_value = 0.0
+	slider.max_value = 100.0
+	slider.step = 5.0
+	slider.value = 0.0 if AudioSynth.is_muted else AudioSynth.master_volume * 100.0
+	slider.custom_minimum_size = Vector2(150.0, 24.0)
+	slider.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	slider.mouse_default_cursor_shape = Control.CURSOR_POINTING_HAND
+
+	var track := StyleBoxFlat.new()
+	track.bg_color = UITheme.with_alpha(UITheme.LINE_DIM, 0.6)
+	track.corner_radius_top_left = 3
+	track.corner_radius_top_right = 3
+	track.corner_radius_bottom_left = 3
+	track.corner_radius_bottom_right = 3
+	track.content_margin_top = 3.0
+	track.content_margin_bottom = 3.0
+
+	var fill := StyleBoxFlat.new()
+	fill.bg_color = UITheme.HEALTHY
+	fill.corner_radius_top_left = 3
+	fill.corner_radius_bottom_left = 3
+	fill.content_margin_top = 3.0
+	fill.content_margin_bottom = 3.0
+
+	slider.add_theme_stylebox_override("slider", track)
+	slider.add_theme_stylebox_override("grabber_area", fill)
+	slider.add_theme_stylebox_override("grabber_area_highlight", fill)
+
+	slider.value_changed.connect(_on_volume_slider_changed)
+	row.add_child(slider)
+	_audio_sliders.append(slider)
+
+	var pct_lbl := _label("SmallLabel")
+	pct_lbl.add_theme_font_override("font", UITheme.mono_bold_font())
+	pct_lbl.add_theme_font_size_override("font_size", 12)
+	pct_lbl.custom_minimum_size = Vector2(42.0, 0.0)
+	pct_lbl.text = "%d%%" % roundi(slider.value)
+	row.add_child(pct_lbl)
+	_audio_pct_labels.append(pct_lbl)
+
+	var mute_btn := Button.new()
+	mute_btn.theme_type_variation = &"ChipButton"
+	mute_btn.custom_minimum_size = Vector2(104.0, 36.0)
+	mute_btn.mouse_default_cursor_shape = Control.CURSOR_POINTING_HAND
+	mute_btn.text = I18n.t("ui.audio.mute_on" if AudioSynth.is_muted else "ui.audio.mute_off")
+	mute_btn.pressed.connect(_on_mute_btn_pressed)
+	row.add_child(mute_btn)
+	_audio_mute_buttons.append(mute_btn)
+
+
+func _on_volume_slider_changed(val: float) -> void:
+	AudioSynth.set_volume(val / 100.0)
+	_sync_audio_controls()
+
+
+func _on_mute_btn_pressed() -> void:
+	AudioSynth.toggle_mute()
+	_sync_audio_controls()
+
+
+func _sync_audio_controls() -> void:
+	var vol_pct: int = 0 if AudioSynth.is_muted else roundi(AudioSynth.master_volume * 100.0)
+	var is_m: bool = AudioSynth.is_muted
+	for s in _audio_sliders:
+		s.set_value_no_signal(float(vol_pct))
+	for p in _audio_pct_labels:
+		p.text = "%d%%" % vol_pct
+	for b in _audio_mute_buttons:
+		b.text = I18n.t("ui.audio.mute_on" if is_m else "ui.audio.mute_off")
+	for ic in _audio_icons:
+		ic.set_icon("sound_off" if is_m else "sound_on", UITheme.TEXT_DIM if is_m else UITheme.HEALTHY, 20.0)
 
 
 func _bracket_draw(panel: Control, col: Color) -> void:
@@ -328,6 +420,11 @@ func _build_main() -> void:
 	col.add_child(lang_holder)
 	_lang_row(lang_holder)
 	_main_items.append(lang_holder)
+
+	var audio_holder := _vbox(0)
+	col.add_child(audio_holder)
+	_audio_row(audio_holder)
+	_main_items.append(audio_holder)
 
 	# Letterbox band texts.
 	var event_line := _label("DimLabel", "ui.menu.event_line")
@@ -518,6 +615,10 @@ func _build_pause() -> void:
 		chips.add_child(b)
 		_lang_buttons.append([b, code])
 	_sync_lang_buttons()
+
+	var audio_box := _vbox(8)
+	col.add_child(audio_box)
+	_audio_row(audio_box)
 
 	var sep2 := HSeparator.new()
 	sep2.mouse_filter = Control.MOUSE_FILTER_IGNORE

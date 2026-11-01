@@ -35,8 +35,8 @@ const STATUS_COLLAPSED := 75.0     # crisis >= this -> "collapsed"
 const BASE_POLLUTION_RATE := 0.060
 const SOURCE_INFLOW_COEFF := 0.120      # x coastal_pop: rivers, sewage, plastic inflow
 const NEIGHBOR_PRESSURE_COEFF := 0.00048  # x neighbour pollution x route weight x kind mult
-const PROTECT_COEFF := 0.0032          # x protection: pollution reduction (at LEVER_POLLUTION_REF)
-const AWARE_COEFF := 0.0080             # x awareness: pollution reduction (at LEVER_POLLUTION_REF)
+const PROTECT_COEFF := 0.0042          # x protection: pollution reduction (at LEVER_POLLUTION_REF)
+const AWARE_COEFF := 0.0090             # x awareness: pollution reduction (at LEVER_POLLUTION_REF)
 const LEVER_POLLUTION_REF := 50.0      # lever reductions scale with pollution / this
 const BIO_SAFE_POLLUTION := 30.0       # below: clean water lets life regrow; above: damage
 const BIO_ROOM_EXPONENT := 2.3         # coral / seagrass recovery x (1 - value / 100) ^ this

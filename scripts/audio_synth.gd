@@ -5,6 +5,10 @@ extends Node
 ## Godot 4's AudioStreamGenerator (zero external audio files).
 
 const SAMPLE_RATE := 22050.0
+const SETTINGS_PATH := "user://settings.cfg"
+
+signal volume_changed(vol: float)
+signal mute_changed(muted: bool)
 
 var _player: AudioStreamPlayer
 var _generator: AudioStreamGenerator
@@ -37,7 +41,25 @@ var _heartbeat_timer: float = 0.0
 
 func _ready() -> void:
 	process_mode = Node.PROCESS_MODE_ALWAYS # Run even when simulation is paused
+	_load_saved_audio_settings()
 	_init_audio_pipeline()
+
+
+func _load_saved_audio_settings() -> void:
+	var cfg := ConfigFile.new()
+	if cfg.load(SETTINGS_PATH) == OK:
+		master_volume = float(cfg.get_value("audio", "volume", 0.65))
+		is_muted = bool(cfg.get_value("audio", "muted", false))
+		ambient_enabled = bool(cfg.get_value("audio", "ambient", true))
+
+
+func _save_audio_settings() -> void:
+	var cfg := ConfigFile.new()
+	cfg.load(SETTINGS_PATH)
+	cfg.set_value("audio", "volume", master_volume)
+	cfg.set_value("audio", "muted", is_muted)
+	cfg.set_value("audio", "ambient", ambient_enabled)
+	cfg.save(SETTINGS_PATH)
 
 
 func _init_audio_pipeline() -> void:
@@ -214,8 +236,23 @@ func set_heartbeat(active: bool) -> void:
 
 func toggle_mute() -> bool:
 	is_muted = not is_muted
+	_save_audio_settings()
+	mute_changed.emit(is_muted)
 	return is_muted
 
 
 func set_muted(val: bool) -> void:
 	is_muted = val
+	_save_audio_settings()
+	mute_changed.emit(is_muted)
+
+
+func set_volume(val: float) -> void:
+	master_volume = clampf(val, 0.0, 1.0)
+	if master_volume <= 0.001:
+		is_muted = true
+	else:
+		is_muted = false
+	_save_audio_settings()
+	volume_changed.emit(master_volume)
+	mute_changed.emit(is_muted)

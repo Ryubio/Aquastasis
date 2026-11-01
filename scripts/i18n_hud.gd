@@ -126,6 +126,78 @@ const STRINGS := {
 		"en": "Net monthly balance (income minus maintenance).",
 		"ru": "Чистый ежемесячный доход (поступления минус расходы)."
 	},
+	"hud.trend.fmt": {"tr": "Trend: {trend}", "en": "Trend: {trend}", "ru": "Динамика: {trend}"},
+	"hud.trend.tip": {
+		"tr": "Aylık kirlilik değişimi. Negatif değerler iyileşmeyi, pozitif değerler kirlilik artışını gösterir.",
+		"en": "Monthly pollution delta. Negative values mean recovery; positive values mean worsening crisis.",
+		"ru": "Ежемесячное изменение загрязнения. Отрицательные значения — улучшение, положительные — ухудшение."
+	},
+	"hud.species.caretta_nests": {"tr": "Caretta Yuvaları: {n}", "en": "Caretta Nests: {n}", "ru": "Гнёзд каретта: {n}"},
+	"hud.species.monk_seals": {"tr": "Akdeniz Foku: {n}", "en": "Monk Seals: {n}", "ru": "Тюленей-монахов: {n}"},
+
+	# --- Interactive Mission Directives ---
+	"directive.title": {"tr": "HAREKAT DİREKTİFİ", "en": "MISSION DIRECTIVE", "ru": "ДИРЕКТИВА МИССИИ"},
+	"directive.step_fmt": {"tr": "ADIM {cur} / {total}", "en": "STEP {cur} / {total}", "ru": "ШАГ {cur} / {total}"},
+	"directive.skip": {"tr": "Rehberi Atla", "en": "Skip Tutorial", "ru": "Пропустить"},
+	"directive.btn.start": {"tr": "▶ 1x Başlat", "en": "▶ Start 1x", "ru": "▶ Запустить 1x"},
+	"directive.step1": {
+		"tr": "🎯 Haritada [Antalya Körfezi] Karargahı'na tıkla. (Burası ana üssümüz! Kriz %75'i geçerse koalisyon çöker.)",
+		"en": "🎯 Click [Antalya Gulf] HQ on the map. (Our command base! If crisis exceeds 75%, the coalition collapses.)",
+		"ru": "🎯 Нажмите на штаб [Залив Антальи] на карте. (Главная база! Если кризис превысит 75%, коалиция падёт.)"
+	},
+	"directive.step2": {
+		"tr": "🧹 Sağ panelden [Acil Temizlik Operasyonu] başlat veya [Q] tuşuna bas. (Kirliliği hızla düşürür.)",
+		"en": "🧹 Trigger [Emergency Cleanup] from the right panel or press [Q]. (Quickly cuts regional pollution.)",
+		"ru": "🧹 Запустите [Очистку] на панели справа или нажмите [Q]. (Быстро снижает загрязнение региона.)"
+	},
+	"directive.step3": {
+		"tr": "🔬 Denizde yüzen parlak [Veri Baloncuğu]na tıkla. (Toplanan Bilim ile yeni teknolojiler araştıracaksın.)",
+		"en": "🔬 Click the floating glowing [Data Bubble] on the sea. (Collected Science unlocks advanced eco-tech.)",
+		"ru": "🔬 Нажмите на светящуюся [Сферу Данных] над морем. (Очки науки нужны для исследований технологий.)"
+	},
+	"directive.step4": {
+		"tr": "📜 [Politika Ağacı [T]] butonuna tıkla ve ilk çevreci kanununu kabul et. (Kalıcı koruma ve altyapı kurar.)",
+		"en": "📜 Open the [Policy Tree [T]] and adopt your first policy. (Establishes lasting marine protections.)",
+		"ru": "📜 Откройте [Древо Политик [T]] и примите первый закон. (Создает долгосрочные морские заповедники.)"
+	},
+	"directive.step5": {
+		"tr": "⏱️ Zaman akışını başlat ([1x] veya [Boşluk]). Hedef: 2046 yılına kadar Deniz Sağlığını %60'a ulaştır!",
+		"en": "⏱️ Start time flow ([1x] or [SPACE]). Mission Goal: Reach ≥ 60% Sea Health before 2046!",
+		"ru": "⏱️ Запустите время ([1x] или [Пробел]). Цель: довести здоровье моря до ≥ 60% к 2046 году!"
+	},
+	"directive.done": {
+		"tr": "🎉 EĞİTİM TAMAMLANDI! Akdeniz Koalisyonu Emrinde. İyi şanslar Komutan!",
+		"en": "🎉 DIRECTIVES COMPLETE! The Mediterranean Coalition is in your hands. Good luck Commander!",
+		"ru": "🎉 ОБУЧЕНИЕ ЗАВЕРШЕНО! Коалиция Средиземноморья под вашим командованием. Удачи!"
+	},
+
+	# --- Tactical Field Manual (Clean [?] Modal) ---
+	"manual.title": {"tr": "COP31 AKDENİZ HAREKAT KILAVUZU", "en": "COP31 MEDITERRANEAN FIELD MANUAL", "ru": "РУКОВОДСТВО ОПЕРАЦИИ COP31"},
+	"manual.close": {"tr": "Anladım (Kapat)", "en": "Understood (Close)", "ru": "Понятно (Закрыть)"},
+	"manual.sec1.title": {"tr": "1. STRATEJİK KAYNAKLAR", "en": "1. CORE RESOURCES", "ru": "1. СТРАТЕГИЧЕСКИЕ РЕСУРСЫ"},
+	"manual.sec1.body": {
+		"tr": "• 💰 Bütçe: Temizlik ve altyapı için harcanır. Sağlıklı deniz ekonomisinden aylık gelir sağlar.\n• 🏛️ Siyasi Destek: Yasalar, kotalar ve diplomatik kararlar için kullanılır. Farkındalık arttıkça büyür.\n• 🔬 Bilim Puanı: Denizde yüzen camgöbeği baloncuklardan toplanır. Teknoloji ağacı ve karşı-aşı için harcanır.",
+		"en": "• 💰 Budget: Spent on cleanups & infrastructure. Earned monthly from a healthy marine economy.\n• 🏛️ Political Support: Spent on laws, quotas, and treaties. Grown by raising public awareness.\n• 🔬 Science Points: Popped from cyan sea bubbles. Spent on Tech Tree research & mutation cures.",
+		"ru": "• 💰 Бюджет: Тратится на очистку и инфраструктуру. Поступает от здоровой морской экономики.\n• 🏛️ Поддержка: Нужна для законов, квот и соглашений. Растет при высокой осведомленности.\n• 🔬 Очки Науки: Собираются со сфер над морем. Нужны для древа технологий и вакцин."
+	},
+	"manual.sec2.title": {"tr": "2. ANTALYA KARARGAHI & KRİZ TEHDİDİ", "en": "2. ANTALYA HQ & BASIN THREATS", "ru": "2. ШТАБ В АНТАЛЬЕ И УГРОЗЫ КРИЗИСА"},
+	"manual.sec2.body": {
+		"tr": "• ⚓ Karargah Kuralı: Antalya Körfezi COP31 merkezidir. Kriz seviyesi %75'e ulaşırsa derhal KAYBEDERSİNİZ!\n• 🌡️ Küresel Isınma: Sıcaklık +4.0°C sınırına ulaşırsa deniz ekosistemi geri dönülemez şekilde çöker.\n• 🧬 Kriz Dirençleri: Sürekli tek tip eylem yaparsanız Kriz mutasyon geçirir ve o taktiğe bağışıklık kazanır.",
+		"en": "• ⚓ HQ Rule: Antalya Gulf is Coalition HQ. If its crisis level reaches 75%, you instantly LOSE!\n• 🌡️ Global Warming: If sea temp hits +4.0°C, the basin triggers irreversible biosphere collapse.\n• 🧬 Crisis Mutations: Spamming one action provokes genetic resistance, nullifying that strategy.",
+		"ru": "• ⚓ Правило штаба: Залив Антальи — штаб COP31. Если кризис там достигнет 75%, вы проиграли!\n• 🌡️ Потепление: При температуре +4.0°C морская биосфера погибает безвозвратно.\n• 🧬 Мутации кризиса: Однотипная тактика провоцирует устойчивость кризиса к вашим действиям."
+	},
+	"manual.sec3.title": {"tr": "3. TAKTİK KLAVYE KISAYOLLARI", "en": "3. TACTICAL HOTKEYS", "ru": "3. ГОРЯЧИЕ КЛАВИШИ"},
+	"manual.sec3.body": {
+		"tr": "• [Q] Acil Temizlik Operasyonu: Seçili bölgedeki kirliliği bütçe harcayarak anında düşürür.\n• [W] Deniz Devriyesi: Kaçak balıkçılığı önler, bölgenin deniz koruma seviyesini artırır.\n• [E] Bilinçlendirme Kampanyası: Kıyı halkını eğitir, farkındalık ve siyasi destek sağlar.\n• [T] Politika Ağacı: Kalıcı 24 farklı çevre yasasını ve bilimsel projeyi açar.\n• [1 / 2 / 3 / Boşluk]: Zaman hızını ayarlar ve simülasyonu duraklatır.",
+		"en": "• [Q] Emergency Cleanup: Instantly cleans regional waste using budget.\n• [W] Sea Patrol: Enforces no-take zones and raises marine protection.\n• [E] Awareness Campaign: Educates coastal public, boosting political support.\n• [T] Policy Tree: Opens 24 permanent marine laws and research projects.\n• [1 / 2 / 3 / SPACE]: Adjusts simulation speed and pauses time.",
+		"ru": "• [Q] Операция очистки: Срочно убирает загрязнение региона за бюджет.\n• [W] Морской патруль: Пресекает браконьерство, повышая охрану моря.\n• [E] Просвещение: Повышает осведомленность жителей и поддержку.\n• [T] Древо политик: Открывает 24 закона и научно-исследовательских проекта.\n• [1 / 2 / 3 / Пробел]: Управление скоростью времени и пауза."
+	},
+	"manual.sec4.title": {"tr": "4. COP31 ZİRVELERİ & 2046 ZAFERİ", "en": "4. COP31 SUMMITS & 2046 VICTORY", "ru": "4. САММИТЫ COP31 И ПОБЕДА 2046"},
+	"manual.sec4.body": {
+		"tr": "• 🏛️ Zirveler: 2031, 2036 ve 2041 yıllarında toplanır. Başarılıysanız büyük fonlar, başarısızsanız zorlu tavizler gelir.\n• 🐢 Biyoçeşitlilik: Kirlilik %25 altına indikçe Antalya ve Ege'de Caretta yuvaları, Marmara ve Adriyatik'te Foklar çoğalır.\n• 🏆 Zafer Şartı: 2046 yılına kadar Deniz Sağlığı Endeksini %60 üzerine çıkarın ya da tüm bölgeleri %25 kriz altına indirin!",
+		"en": "• 🏛️ Summits: Convene in 2031, 2036, and 2041. Success grants massive funds; failure forces concessions.\n• 🐢 Biodiversity: Keeping pollution under 25% restores Caretta turtle nests and Monk seal colonies.\n• 🏆 Victory: Sustain Basin Sea Health ≥ 60% (or all regions < 25% crisis) by 2046 to save the sea!",
+		"ru": "• 🏛️ Саммиты: Проходят в 2031, 2036 и 2041 годах. Успех дает гранты, провал — штрафы.\n• 🐢 Биоразнообразие: При загрязнении < 25% популяции черепах каретта и тюленей-монахов растут.\n• 🏆 Победа: Достигните здоровья моря ≥ 60% к 2046 году, чтобы спасти Средиземноморье!"
+	},
 
 	# --- Resource Tooltips ---
 	"res.budget.tip": {
@@ -237,12 +309,17 @@ const STRINGS := {
 	# --- Antalya Coalition HQ & Flagship Species ---
 	"hud.antalya_hq.title": {"tr": "ANTALYA KOALİSYON MERKEZİ", "en": "ANTALYA COALITION HQ", "ru": "ШТАБ-КВАРТИРА В АНТАЛЬЕ"},
 	"hud.antalya_hq.desc": {"tr": "COP31 komuta üssümüz. Antalya Körfezi kriz seviyesi %{limit} sınırına ulaşırsa operasyon kaybedilir! (Durum: %{integrity} Sağlam)", "en": "Our COP31 command center. If Antalya Gulf crisis reaches {limit}%, mission is instantly lost! (Status: {integrity}% Integrity)", "ru": "Командный центр COP31. Если кризис в Анталье достигнет {limit}%, миссия провалена! (Целостность: {integrity}%)"},
-	"hud.species.title": {"tr": "SEMBOLLER VE BİYOÇEŞİTLİLİK", "en": "FLAGSHIP BIODIVERSITY", "ru": "СИМВОЛЫ БИОРАЗНООБРАЗИЯ"},
+	"hud.species.title": {"tr": "BİYOÇEŞİTLİLİK GÖSTERGELERİ", "en": "BIODIVERSITY INDICATORS", "ru": "ИНДИКАТОРЫ БИОРАЗНООБРАЗИЯ"},
+	"hud.species.body": {
+		"tr": "🐢 Caretta Yuvaları (Antalya & Ege): Kirlilik <%25 ve Posidonia arttıkça çoğalır.\n🦭 Akdeniz Foku (Marmara & Adriyatik): Deniz Koruma Alanları (MPA) ile artar.",
+		"en": "🐢 Caretta Nests (Antalya & Aegean): Grow as pollution drops <25% and Posidonia recovers.\n🦭 Monk Seals (Marmara & Adriatic): Rebound with Marine Protected Areas (MPA).",
+		"ru": "🐢 Гнезда каретты (Анталья и Эгейское): растут при загрязнении <25% и посидонии.\n🦭 Тюлени-монахи (Мраморное и Адриатика): растут с расширением заповедников (МПА)."
+	},
 	"hud.species.turtle": {"tr": "Caretta Yuvaları", "en": "Caretta Nests", "ru": "Гнезда каретты"},
-	"hud.species.turtle.desc": {"tr": "Antalya ve Ege sahillerindeki aktif yuva sayısı. Kirlilik %25'in altına düştükçe ve Posidonia arttıkça yuvalar çoğalır.", "en": "Active sea turtle nests in Antalya and Aegean. Thrives as pollution drops under 25% and Posidonia recovers.", "ru": "Гнезда черепах в Анталье и Эгейском море. Растут при загрязнении <25% и восстановлении посидонии."},
+	"hud.species.turtle.desc": {"tr": "Antalya ve Ege sahillerindeki aktif yuva sayısı.", "en": "Active turtle nest counts in Antalya & Aegean.", "ru": "Количество гнезд каретты в Анталье и на Эгейском море."},
 	"hud.species.seal": {"tr": "Akdeniz Foku", "en": "Monk Seals", "ru": "Тюлени-монахи"},
-	"hud.species.seal.desc": {"tr": "Marmara ve Adriyatik'teki nesli tükenmekte olan fok nüfusu. Deniz Koruma Alanları (MPA) kuruldukça popülasyon artar.", "en": "Endangered Mediterranean monk seal population in Marmara & Adriatic. Recovers with Marine Protected Areas (MPA).", "ru": "Популяция тюленей-монахов в Мраморном и Адриатическом морях. Растет при создании морских заповедников (МПА)."},
-	"hud.species.tip": {"tr": "Biyoçeşitlilik Göstergeleri: Caretta Caretta ve Akdeniz Foku popülasyonları ekosistem sağlığını temsil eder.", "en": "Biodiversity Indicators: Caretta Caretta and Monk Seal counts reflect ecosystem recovery.", "ru": "Индикаторы биоразнообразия: популяции черепах каретта и тюленей-монахов отражают здоровье экосистемы."},
+	"hud.species.seal.desc": {"tr": "Marmara ve Adriyatik'teki nesli tehlikedeki fok nüfusu.", "en": "Endangered monk seal counts in Marmara & Adriatic.", "ru": "Популяция тюленей-монахов в Мраморном и Адриатическом морях."},
+	"hud.species.tip": {"tr": "Ekosistemin sağlığını ve canlı türlerini temsil eder.", "en": "Reflects basin biodiversity health.", "ru": "Отражает здоровье биоразнообразия бассейна."},
 
 	# --- COP31 Summits ---
 	"summit.modal.title": {"tr": "COP31 AKDENİZ LİDERLER ZİRVESİ", "en": "COP31 MEDITERRANEAN LEADERS SUMMIT", "ru": "САММИТ ЛИДЕРОВ СРЕДИЗЕМНОМОРЬЯ COP31"},

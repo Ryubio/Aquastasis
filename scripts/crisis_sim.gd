@@ -650,6 +650,7 @@ func perform(action_id: String, region_id: String) -> Dictionary:
 		"patrol":
 			var patrol_gain: float = B.PATROL_PROTECTION_GAIN * _mul("patrol_power_mult")
 			r.protection += _saturated(patrol_gain, r.protection, B.PATROL_SATURATION)
+			r.pollution = maxf(0.0, r.pollution - 1.5 * _mul("patrol_power_mult"))
 		"campaign":
 			var campaign_gain: float = B.CAMPAIGN_AWARENESS_GAIN * _mul("campaign_power_mult")
 			r.awareness += _saturated(campaign_gain, r.awareness, B.CAMPAIGN_SATURATION)
@@ -660,6 +661,7 @@ func perform(action_id: String, region_id: String) -> Dictionary:
 				var other: RegionData = _region(other_id)
 				other.awareness += _saturated(campaign_gain * B.CAMPAIGN_NEIGHBOR_SHARE, other.awareness, B.CAMPAIGN_SATURATION)
 				other.clamp_all()
+			r.pollution = maxf(0.0, r.pollution - 2.0 * _mul("campaign_power_mult"))
 	r.clamp_all()
 
 	var cooldown: int = int(def["cooldown_ticks"])
@@ -1637,6 +1639,22 @@ func _update_bubbles(res: Dictionary) -> void:
 	_bubbles.append(bubble)
 	var spawned: Array = res["bubbles_spawned"]
 	spawned.append(bubble.duplicate())
+
+
+## Spawns a dedicated bubble for onboarding/tutorial without waiting for RNG ticks.
+func spawn_tutorial_bubble(kind: String = "science", region_id: String = "antalya") -> Dictionary:
+	var bubble: Dictionary = {
+		"id": _next_bubble_id,
+		"kind": kind,
+		"region": region_id,
+		"amount": 25.0,
+		"ttl": 240,
+		"born": tick,
+	}
+	_next_bubble_id += 1
+	bubbles_spawned_total += 1
+	_bubbles.append(bubble)
+	return bubble
 
 
 ## Science bubbles surface anywhere; political ones favour regions with high awareness.

@@ -271,7 +271,7 @@ func _draw() -> void:
 		"caretta":
 			_draw_caretta()
 		"turtle":
-			_turtle_at(Vector2(0.0, 0.04), 1.05, 0.0, 0.28)
+			_turtle_at(Vector2(0.0, 0.02), 0.78, 0.0, 0.35)
 		"seal":
 			_draw_seal()
 		"sound_on":

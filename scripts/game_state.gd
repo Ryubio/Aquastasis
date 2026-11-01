@@ -349,6 +349,12 @@ func collect_bubble(bubble_id: int) -> bool:
 	return true
 
 
+func spawn_tutorial_bubble(kind: String = "science", region_id: String = "antalya") -> void:
+	if sim != null and running:
+		var b: Dictionary = sim.spawn_tutorial_bubble(kind, region_id)
+		EventBus.bubble_spawned.emit(b)
+
+
 # --- COP31 Summits -------------------------------------------------------------------
 
 func current_summit() -> Dictionary:

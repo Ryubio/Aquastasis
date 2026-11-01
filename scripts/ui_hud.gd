@@ -43,14 +43,13 @@ const AWARE_COLOR := Color(0.42, 0.78, 1.0)
 const SPEED_ICONS := ["pause", "play", "fast", "faster"]
 const SPEED_TEXT := ["", "1x", "2x", "4x"]
 const SPEED_KEYS := ["hud.speed.pause", "hud.speed.x1", "hud.speed.x2", "hud.speed.x4"]
-## Region stat rows: [data key, i18n key, icon, bar mode]
+## Region stat rows: [data key, i18n key, icon, bar mode] (decluttered to core ecosystem vitals)
 const STAT_ROWS := [
-	["pollution", "hud.region.pollution", "pollution", "inverse"],
 	["coral_health", "hud.region.coral", "coral", "health"],
 	["seagrass", "hud.region.seagrass", "seagrass", "health"],
 	["fish_stock", "hud.region.fish", "fish", "health"],
-	["awareness", "hud.region.awareness", "awareness", "aware"],
 	["protection", "hud.region.protection", "protection", "protect"],
+	["awareness", "hud.region.awareness", "awareness", "aware"],
 ]
 
 var _tr_labels: Array = []          # [[Label, key], ...] re-rendered on language_changed
@@ -105,10 +104,14 @@ var _hint_box: HBoxContainer
 var _hint_icon: Icons
 var _details: VBoxContainer
 var _region_name: Label
+var _region_species_badge: PanelContainer
+var _region_species_icon: Icons
+var _region_species_label: Label
 var _region_trait_box: PanelContainer
 var _region_trait_label: Label
-var _bd_box: PanelContainer
-var _bd_labels: Dictionary = {}
+var _region_trend_badge: PanelContainer
+var _region_trend_icon: Icons
+var _region_trend_label: Label
 var _badge: PanelContainer
 var _badge_label: Label
 var _region_crisis_bar: Charts
@@ -158,19 +161,28 @@ var _vignette_color: Color = UITheme.CRISIS
 var _vignette_tween: Tween = null
 var _floating_layer: Control
 
-# 60-Second Onboarding Briefing
-var _onboarding_box: PanelContainer
-var _onboarding_timer_label: Label
-var _onboarding_done_label: Label
-var _onboarding_steps: Array = []       # [ { "icon": Icons, "label": Label, "key": String }, ... ]
-var _onboard_steps_done: Array = [false, false, false, false]
-var _onboard_time_left: float = 60.0
-var _onboard_active: bool = false
+# 3D Map injection for dynamic region targeting
+var map: Node = null
+
+# Interactive Mission Directives HUD (unobtrusive, hands-on guided tutorial)
+var _directive_box: PanelContainer
+var _directive_step_label: Label
+var _directive_body_label: RichTextLabel
+var _directive_pips: Array = []
+var _directive_action_btn: Button
+var _directive_skip_btn: Button
+var _directive_step: int = 1
+var _directive_active: bool = false
+var _directive_pulse_time: float = 0.0
+var _directive_overlay: Control
+
+# Tactical Field Manual Modal (Clean [?] Reference Guide)
+var _help_modal: Control
+var _help_backdrop: Control
 
 # Flagship Biodiversity & Barometer (Top bar)
-var _turtle_chip: PanelContainer
+var _bio_chip: PanelContainer
 var _turtle_count: Label
-var _seal_chip: PanelContainer
 var _seal_count: Label
 var _defcon_badge: PanelContainer
 var _defcon_label: Label
@@ -198,18 +210,6 @@ var _summit_opt_b_desc: Label
 var _summit_opt_b_btn: Button
 var _current_summit_data: Dictionary = {}
 
-# Tactical Spotlight Briefing Modal
-var _briefing_modal: Control
-var _briefing_backdrop: Control
-var _briefing_step: int = 1
-var _briefing_step_label: Label
-var _briefing_card_icon: Icons
-var _briefing_card_title: Label
-var _briefing_card_text: RichTextLabel
-var _briefing_prev_btn: Button
-var _briefing_next_btn: Button
-var _briefing_skip_btn: Button
-
 
 func _ready() -> void:
 	set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
@@ -222,8 +222,8 @@ func _ready() -> void:
 	_build_left_panel()
 	_build_right_panel()
 	_build_toasts()
-	_build_onboarding()
-	_build_tactical_briefing()
+	_build_directives()
+	_build_manual_modal()
 	_build_summit_modal()
 	_build_tip()
 	visible = false
@@ -245,7 +245,7 @@ func _ready() -> void:
 	EventBus.spread_happened.connect(_on_spread_happened)
 	EventBus.bubble_collected.connect(_on_bubble_collected)
 	EventBus.summit_triggered.connect(_on_summit_triggered)
-	EventBus.tutorial_requested.connect(_show_tactical_briefing)
+	EventBus.tutorial_requested.connect(_show_manual)
 
 	_select_region(GameState.selected_region)
 	_on_speed_changed(GameState.speed_index)
@@ -546,44 +546,36 @@ func _build_top_bar() -> void:
 
 	row.add_child(_vline(36.0))
 
-	# Flagship Biodiversity (Turtles & Monk Seals)
-	var bio_box := _hbox(6)
-	bio_box.mouse_filter = Control.MOUSE_FILTER_PASS
-	bio_box.mouse_entered.connect(_on_species_hover.bind(bio_box))
-	bio_box.mouse_exited.connect(_hide_tip.bind(bio_box))
-	row.add_child(bio_box)
+	# Flagship Biodiversity (Turtles & Monk Seals combined in one compact badge)
+	_bio_chip = PanelContainer.new()
+	_bio_chip.theme_type_variation = &"BadgePanel"
+	_bio_chip.add_theme_stylebox_override("panel", UITheme.badge_box(UITheme.HEALTHY))
+	_bio_chip.mouse_filter = Control.MOUSE_FILTER_PASS
+	_bio_chip.mouse_entered.connect(_on_species_hover.bind(_bio_chip))
+	_bio_chip.mouse_exited.connect(_hide_tip.bind(_bio_chip))
+	row.add_child(_bio_chip)
+	var bio_inner := _hbox(5)
+	_bio_chip.add_child(bio_inner)
 
-	_turtle_chip = PanelContainer.new()
-	_turtle_chip.theme_type_variation = &"BadgePanel"
-	_turtle_chip.add_theme_stylebox_override("panel", UITheme.badge_box(UITheme.HEALTHY))
-	_turtle_chip.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	var turtle_inner := _hbox(4)
-	_turtle_chip.add_child(turtle_inner)
-	var t_ico: Icons = _icon("turtle", UITheme.HEALTHY, 18.0)
+	var t_ico: Icons = _icon("turtle", UITheme.HEALTHY, 16.0)
 	t_ico.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	turtle_inner.add_child(t_ico)
+	bio_inner.add_child(t_ico)
 	_turtle_count = _label("SmallLabel")
 	_turtle_count.add_theme_font_override("font", UITheme.mono_bold_font())
 	_turtle_count.add_theme_color_override("font_color", UITheme.HEALTHY.lerp(Color.WHITE, 0.25))
 	_turtle_count.text = "0"
-	turtle_inner.add_child(_turtle_count)
-	bio_box.add_child(_turtle_chip)
+	bio_inner.add_child(_turtle_count)
 
-	_seal_chip = PanelContainer.new()
-	_seal_chip.theme_type_variation = &"BadgePanel"
-	_seal_chip.add_theme_stylebox_override("panel", UITheme.badge_box(UITheme.SCIENCE_BLUE))
-	_seal_chip.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	var seal_inner := _hbox(4)
-	_seal_chip.add_child(seal_inner)
-	var s_ico: Icons = _icon("seal", UITheme.SCIENCE_BLUE, 18.0)
+	bio_inner.add_child(_vline(14.0))
+
+	var s_ico: Icons = _icon("seal", UITheme.SCIENCE_BLUE, 16.0)
 	s_ico.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	seal_inner.add_child(s_ico)
+	bio_inner.add_child(s_ico)
 	_seal_count = _label("SmallLabel")
 	_seal_count.add_theme_font_override("font", UITheme.mono_bold_font())
 	_seal_count.add_theme_color_override("font_color", UITheme.SCIENCE_BLUE.lerp(Color.WHITE, 0.25))
 	_seal_count.text = "0"
-	seal_inner.add_child(_seal_count)
-	bio_box.add_child(_seal_chip)
+	bio_inner.add_child(_seal_count)
 
 	row.add_child(_vline(36.0))
 
@@ -656,7 +648,7 @@ func _build_top_bar() -> void:
 	_help_icon.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	_help_icon.set_anchors_and_offsets_preset(Control.PRESET_CENTER)
 	_help_btn.add_child(_help_icon)
-	_help_btn.pressed.connect(_show_tactical_briefing)
+	_help_btn.pressed.connect(_show_manual)
 	_help_btn.mouse_entered.connect(_on_help_hover.bind(_help_btn))
 	_help_btn.mouse_exited.connect(_hide_tip.bind(_help_btn))
 	util_box.add_child(_help_btn)
@@ -692,7 +684,7 @@ func _build_left_panel() -> void:
 
 	var th := _hbox(8)
 	col.add_child(th)
-	th.add_child(_icon("temperature", UITheme.WARNING, 18.0))
+	th.add_child(_icon("temperature", UITheme.WARNING, 16.0))
 	var tl := _label("SmallLabel", "hud.temperature")
 	_ellipsis(tl)
 	th.add_child(tl)
@@ -700,27 +692,25 @@ func _build_left_panel() -> void:
 	inset.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	col.add_child(inset)
 	_gauge = Charts.new()
-	_gauge.setup_gauge(Vector2(280.0, 158.0))
+	_gauge.setup_gauge(Vector2(260.0, 105.0))
 	inset.add_child(_gauge)
 	_gauge.set_value(1.5, true)
 
-	var limit := _hbox(8)
-	col.add_child(limit)
-	limit.add_child(_icon("warning", UITheme.CRISIS, 14.0))
+	var limits_box := _hbox(6)
+	col.add_child(limits_box)
+	limits_box.add_child(_icon("warning", UITheme.CRISIS, 13.0))
 	var ll := _label("DimLabel", "hud.temp_limit")
 	ll.add_theme_color_override("font_color", UITheme.with_alpha(UITheme.CRISIS, 0.85))
 	_ellipsis(ll)
-	limit.add_child(ll)
+	limits_box.add_child(ll)
 
-	var goal := _hbox(8)
-	col.add_child(goal)
-	goal.add_child(_icon("target", UITheme.AMBER, 16.0))
-	var gl := _label("SmallLabel", "hud.goal")
-	gl.add_theme_color_override("font_color", UITheme.AMBER.lerp(UITheme.TEXT, 0.35))
-	gl.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	gl.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	gl.custom_minimum_size = Vector2(200.0, 0.0)
-	goal.add_child(gl)
+	limits_box.add_child(_vline(12.0))
+
+	limits_box.add_child(_icon("target", UITheme.AMBER, 13.0))
+	var gl := _label("DimLabel", "hud.goal")
+	gl.add_theme_color_override("font_color", UITheme.AMBER.lerp(UITheme.TEXT, 0.25))
+	_ellipsis(gl)
+	limits_box.add_child(gl)
 	col.add_child(_sep())
 	_build_chart_section(col)
 	col.add_child(_sep())
@@ -920,6 +910,22 @@ func _build_right_panel() -> void:
 	_region_name.custom_minimum_size = Vector2(280.0, 0.0)
 	_details.add_child(_region_name)
 
+	# Region Flagship Species badge (Caretta / Monk seal)
+	_region_species_badge = PanelContainer.new()
+	_region_species_badge.theme_type_variation = &"BadgePanel"
+	_region_species_badge.add_theme_stylebox_override("panel", UITheme.badge_box(UITheme.HEALTHY))
+	_region_species_badge.mouse_filter = Control.MOUSE_FILTER_PASS
+	_region_species_badge.visible = false
+	_details.add_child(_region_species_badge)
+	var sp_row := _hbox(6)
+	_region_species_badge.add_child(sp_row)
+	_region_species_icon = _icon("turtle", UITheme.HEALTHY, 14.0)
+	sp_row.add_child(_region_species_icon)
+	_region_species_label = _label("BadgeLabel")
+	_region_species_label.add_theme_color_override("font_color", UITheme.HEALTHY.lerp(Color.WHITE, 0.25))
+	_ellipsis(_region_species_label)
+	sp_row.add_child(_region_species_label)
+
 	_region_trait_box = PanelContainer.new()
 	_region_trait_box.theme_type_variation = &"BadgePanel"
 	_region_trait_box.add_theme_stylebox_override("panel", UITheme.badge_box(UITheme.WARNING))
@@ -951,9 +957,14 @@ func _build_right_panel() -> void:
 		if bar_mode == "aware" or bar_mode == "protect":
 			m = "fixed"
 		_stat_bars[data_key] = _small_stat(rows, icon_id, key, m, tint)
-	var cp := _hbox(8)
-	_details.add_child(cp)
-	cp.add_child(_icon("population", UITheme.TEXT_DIM, 16.0))
+
+	# Clean Single-Line Summary: Coastal Pop Pressure + Net Pollution Trend
+	var meta_row := _hbox(10)
+	_details.add_child(meta_row)
+
+	var cp := _hbox(5)
+	meta_row.add_child(cp)
+	cp.add_child(_icon("population", UITheme.TEXT_DIM, 14.0))
 	var cpl := _label("DimLabel", "hud.region.coastal_pop")
 	_ellipsis(cpl)
 	cp.add_child(cpl)
@@ -961,46 +972,21 @@ func _build_right_panel() -> void:
 	_coastal_value.add_theme_color_override("font_color", UITheme.TEXT_DIM)
 	cp.add_child(_coastal_value)
 
-	# Monthly Dynamics Breakdown
-	_bd_box = _panel("InsetPanel")
-	_bd_box.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	_bd_box.visible = false
-	_details.add_child(_bd_box)
-	var bd_col := _vbox(3)
-	_bd_box.add_child(bd_col)
-	var bd_head := _hbox(6)
-	bd_col.add_child(bd_head)
-	bd_head.add_child(_icon("trend_down", UITheme.AMBER, 14.0))
-	var bd_title := _label("HeaderLabel", "hud.breakdown.title")
-	bd_title.add_theme_font_size_override("font_size", 10)
-	bd_title.add_theme_color_override("font_color", UITheme.AMBER.lerp(Color.WHITE, 0.2))
-	bd_head.add_child(bd_title)
+	meta_row.add_child(_spacer())
 
-	var bd_items := [
-		["shipping", "hud.breakdown.shipping", UITheme.CRISIS],
-		["currents", "hud.breakdown.currents", UITheme.WARNING],
-		["coastal", "hud.breakdown.coastal", UITheme.WARNING],
-		["heat", "hud.breakdown.heat", UITheme.CRISIS],
-		["shield", "hud.breakdown.shield", UITheme.HEALTHY],
-		["net", "hud.breakdown.net", UITheme.TEXT],
-	]
-	for item in bd_items:
-		var k: String = item[0]
-		var name_key: String = item[1]
-		var col_hint: Color = item[2]
-		var row := _hbox(4)
-		bd_col.add_child(row)
-		var lbl := _label("DimLabel", name_key)
-		lbl.add_theme_font_size_override("font_size", 10)
-		lbl.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-		_ellipsis(lbl)
-		row.add_child(lbl)
-		var val_l := _label("SmallLabel")
-		val_l.add_theme_font_override("font", UITheme.mono_bold_font())
-		val_l.add_theme_font_size_override("font_size", 10)
-		val_l.add_theme_color_override("font_color", col_hint)
-		row.add_child(val_l)
-		_bd_labels[k] = val_l
+	_region_trend_badge = PanelContainer.new()
+	_region_trend_badge.theme_type_variation = &"BadgePanel"
+	_region_trend_badge.mouse_filter = Control.MOUSE_FILTER_PASS
+	_region_trend_badge.mouse_entered.connect(_on_trend_hover)
+	_region_trend_badge.mouse_exited.connect(_hide_tip.bind(_region_trend_badge))
+	meta_row.add_child(_region_trend_badge)
+	var trend_inner := _hbox(4)
+	_region_trend_badge.add_child(trend_inner)
+	_region_trend_icon = _icon("trend_down", UITheme.HEALTHY, 13.0)
+	trend_inner.add_child(_region_trend_icon)
+	_region_trend_label = _label("BadgeLabel")
+	_region_trend_label.add_theme_font_override("font", UITheme.mono_bold_font())
+	trend_inner.add_child(_region_trend_label)
 
 	col.add_child(_sep())
 	var ops_head := _hbox(8)
@@ -1020,7 +1006,7 @@ func _build_right_panel() -> void:
 func _build_tree_button(col: VBoxContainer) -> void:
 	_tree_btn = Button.new()
 	_tree_btn.toggle_mode = true
-	_tree_btn.custom_minimum_size = Vector2(0.0, 60.0)
+	_tree_btn.custom_minimum_size = Vector2(0.0, 50.0)
 	_wire_button(_tree_btn)
 	_tree_btn.mouse_entered.connect(_on_tree_hover)
 	_tree_btn.mouse_exited.connect(_hide_tip.bind(_tree_btn))
@@ -1030,10 +1016,10 @@ func _build_tree_button(col: VBoxContainer) -> void:
 	row.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	row.offset_left = 12.0
 	row.offset_right = -12.0
-	row.offset_top = 6.0
-	row.offset_bottom = -6.0
+	row.offset_top = 4.0
+	row.offset_bottom = -4.0
 	_tree_btn.add_child(row)
-	_tree_icon = _icon(_icon_or("tree", "globe"), UITheme.AMBER, 36.0)
+	_tree_icon = _icon(_icon_or("tree", "globe"), UITheme.AMBER, 30.0)
 	row.add_child(_tree_icon)
 	var mid := _vbox(2)
 	mid.alignment = BoxContainer.ALIGNMENT_CENTER
@@ -1085,7 +1071,7 @@ func _stat_tint(data_key: String) -> Color:
 		"awareness":
 			return AWARE_COLOR
 		"protection":
-			return UITheme.AMBER
+			return Color(0.18, 0.85, 0.72)
 	return UITheme.TEXT
 
 
@@ -1115,7 +1101,7 @@ func _build_action_row(parent: Control, action_id: String) -> void:
 	var def: Dictionary = Balance.ACTIONS[action_id]
 	var btn := Button.new()
 	btn.theme_type_variation = &"ActionButton"
-	btn.custom_minimum_size = Vector2(0.0, 66.0)
+	btn.custom_minimum_size = Vector2(0.0, 52.0)
 	_wire_button(btn)
 	btn.mouse_entered.connect(_on_action_hover.bind(btn, action_id))
 	btn.mouse_exited.connect(_hide_tip.bind(btn))
@@ -1126,16 +1112,16 @@ func _build_action_row(parent: Control, action_id: String) -> void:
 	row.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	row.offset_left = 10.0
 	row.offset_right = -12.0
-	row.offset_top = 5.0
-	row.offset_bottom = -9.0
+	row.offset_top = 4.0
+	row.offset_bottom = -6.0
 	btn.add_child(row)
-	var ic := _icon(str(def.get("icon", action_id)), UITheme.HEALTHY, 40.0)
+	var ic := _icon(str(def.get("icon", action_id)), UITheme.HEALTHY, 32.0)
 	row.add_child(ic)
 	var mid := _vbox(2)
 	mid.alignment = BoxContainer.ALIGNMENT_CENTER
 	mid.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	row.add_child(mid)
-	var name_row := _hbox(7)
+	var name_row := _hbox(6)
 	mid.add_child(name_row)
 	var idx: int = Balance.ACTION_ORDER.find(action_id)
 	var hotkey: String = ""
@@ -1146,7 +1132,7 @@ func _build_action_row(parent: Control, action_id: String) -> void:
 		name_row.add_child(cap)
 	var name_l := _label("SmallLabel")
 	name_l.add_theme_font_override("font", UITheme.mono_bold_font())
-	name_l.add_theme_font_size_override("font_size", 15)
+	name_l.add_theme_font_size_override("font_size", 13)
 	_ellipsis(name_l)
 	name_row.add_child(name_l)
 	var status_l := _label("DimLabel")
@@ -1336,157 +1322,259 @@ func _spawn_floating_text(text: String, col: Color, global_pos: Vector2, rise: f
 
 # --- 60-Second Onboarding Briefing --------------------------------------------------------
 
-func _build_onboarding() -> void:
-	_onboarding_box = PanelContainer.new()
-	_onboarding_box.theme_type_variation = &"HudPanel"
-	_onboarding_box.custom_minimum_size = Vector2(360.0, 0.0)
-	_onboarding_box.position = Vector2(MARGIN + LEFT_W + 24.0, PANEL_Y)
-	_onboarding_box.visible = false
-	add_child(_onboarding_box)
+# --- Interactive Mission Directives HUD (5 Hands-On Guided Steps) -------------------------
 
-	var col := _vbox(6)
-	_onboarding_box.add_child(col)
+func _build_directives() -> void:
+	_directive_box = PanelContainer.new()
+	_directive_box.theme_type_variation = &"HudPanel"
+	_directive_box.custom_minimum_size = Vector2(640.0, 80.0)
+	_directive_box.position = Vector2((1920.0 - 640.0) * 0.5, TOP_H + TICKER_H + 12.0)
+	_directive_box.mouse_filter = Control.MOUSE_FILTER_PASS
+	_directive_box.visible = false
+	_directive_box.z_index = 22
+	var sb: StyleBoxFlat = UITheme.panel_box(UITheme.AMBER, UITheme.with_alpha(UITheme.BG_PANEL, 0.96), 2, UITheme.with_alpha(UITheme.AMBER, 0.25), 16, 12)
+	sb.content_margin_left = 18.0
+	sb.content_margin_right = 18.0
+	sb.content_margin_top = 10.0
+	sb.content_margin_bottom = 10.0
+	_directive_box.add_theme_stylebox_override("panel", sb)
+	add_child(_directive_box)
 
-	var head := _hbox(8)
-	col.add_child(head)
-	head.add_child(_icon("crosshair", UITheme.AMBER, 16.0))
-	var title_l := _label("HeaderLabel", "onboarding.title")
-	title_l.add_theme_color_override("font_color", UITheme.AMBER)
-	title_l.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	head.add_child(title_l)
+	var dcol := _vbox(4)
+	_directive_box.add_child(dcol)
 
-	_onboarding_timer_label = _label("SmallLabel")
-	_onboarding_timer_label.add_theme_font_override("font", UITheme.mono_bold_font())
-	_onboarding_timer_label.add_theme_color_override("font_color", UITheme.TEXT_DIM)
-	_onboarding_timer_label.text = "60s"
-	head.add_child(_onboarding_timer_label)
+	var dhead := _hbox(8)
+	dcol.add_child(dhead)
 
-	var dismiss_btn := Button.new()
-	dismiss_btn.theme_type_variation = &"ChipButton"
-	dismiss_btn.text = "✕"
-	dismiss_btn.custom_minimum_size = Vector2(22.0, 22.0)
-	dismiss_btn.focus_mode = Control.FOCUS_NONE
-	dismiss_btn.pressed.connect(_dismiss_onboarding)
-	head.add_child(dismiss_btn)
+	var dicon := _icon("crosshair", UITheme.AMBER, 18.0)
+	dhead.add_child(dicon)
 
-	col.add_child(_sep())
+	_directive_step_label = _label("HeaderLabel")
+	_directive_step_label.add_theme_font_size_override("font_size", 13)
+	_directive_step_label.add_theme_color_override("font_color", UITheme.AMBER)
+	dhead.add_child(_directive_step_label)
 
-	_onboarding_steps.clear()
-	var step_keys := [
-		"onboarding.step1",
-		"onboarding.step2",
-		"onboarding.step3",
-		"onboarding.step4",
-	]
-	for k in step_keys:
-		var key: String = k
-		var row := _hbox(8)
-		col.add_child(row)
-		var ic := _icon("target", UITheme.TEXT_DIM, 14.0)
-		row.add_child(ic)
-		var sl := _label("BodyLabel", key)
-		sl.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-		sl.custom_minimum_size = Vector2(300.0, 0.0)
-		row.add_child(sl)
-		_onboarding_steps.append({"icon": ic, "label": sl, "key": key})
+	var pips_row := _hbox(6)
+	dhead.add_child(pips_row)
+	_directive_pips.clear()
+	for i in 5:
+		var pip := _label("SmallLabel")
+		pip.text = "○"
+		pip.add_theme_font_override("font", UITheme.mono_bold_font())
+		pip.add_theme_font_size_override("font_size", 14)
+		pip.add_theme_color_override("font_color", UITheme.TEXT_DIM)
+		pips_row.add_child(pip)
+		_directive_pips.append(pip)
 
-	_onboarding_done_label = _label("HeaderLabel", "onboarding.done")
-	_onboarding_done_label.add_theme_color_override("font_color", UITheme.HEALTHY)
-	_onboarding_done_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	_onboarding_done_label.visible = false
-	col.add_child(_onboarding_done_label)
+	dhead.add_child(_spacer())
+
+	_directive_action_btn = Button.new()
+	_directive_action_btn.theme_type_variation = &"PrimaryButton"
+	_directive_action_btn.text = I18n.t("directive.btn.start")
+	_directive_action_btn.custom_minimum_size = Vector2(110.0, 26.0)
+	_directive_action_btn.mouse_default_cursor_shape = Control.CURSOR_POINTING_HAND
+	_directive_action_btn.visible = false
+	_directive_action_btn.pressed.connect(_on_directive_action_pressed)
+	dhead.add_child(_directive_action_btn)
+
+	_directive_skip_btn = Button.new()
+	_directive_skip_btn.theme_type_variation = &"ChipButton"
+	_directive_skip_btn.text = I18n.t("directive.skip")
+	_directive_skip_btn.mouse_default_cursor_shape = Control.CURSOR_POINTING_HAND
+	_directive_skip_btn.pressed.connect(_dismiss_directives)
+	dhead.add_child(_directive_skip_btn)
+
+	_directive_body_label = RichTextLabel.new()
+	_directive_body_label.bbcode_enabled = true
+	_directive_body_label.fit_content = true
+	_directive_body_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_directive_body_label.add_theme_font_override("normal_font", UITheme.body_font())
+	_directive_body_label.add_theme_font_override("bold_font", UITheme.mono_bold_font())
+	_directive_body_label.add_theme_font_size_override("normal_font_size", 14)
+	_directive_body_label.add_theme_font_size_override("bold_font_size", 14)
+	_directive_body_label.add_theme_color_override("default_color", UITheme.TEXT)
+	dcol.add_child(_directive_body_label)
+
+	# Overlay for drawing pulsing highlight boxes & pointers directly over targets
+	_directive_overlay = Control.new()
+	_directive_overlay.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	_directive_overlay.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_directive_overlay.z_index = 20
+	_directive_overlay.draw.connect(_on_directive_overlay_draw)
+	add_child(_directive_overlay)
 
 
-func _start_onboarding() -> void:
-	_onboard_active = true
-	_onboard_time_left = 60.0
-	_onboard_steps_done = [false, false, false, false]
-	if _onboarding_box != null:
-		_onboarding_box.visible = true
-		_onboarding_box.modulate.a = 1.0
-	if _onboarding_done_label != null:
-		_onboarding_done_label.visible = false
-	_update_onboarding_ui()
+func _start_directives() -> void:
+	_directive_active = true
+	_directive_step = 1
+	_directive_pulse_time = 0.0
+	if _directive_box != null:
+		_directive_box.visible = true
+		_directive_box.modulate.a = 1.0
+	_update_directive_ui()
 
 
-func _dismiss_onboarding() -> void:
-	if not _onboard_active:
+func _set_directive_step(step: int) -> void:
+	if not _directive_active:
 		return
-	_onboard_active = false
-	if _onboarding_box != null:
-		var tw := create_tween()
-		tw.tween_property(_onboarding_box, "modulate:a", 0.0, 0.4)
-		tw.tween_callback(func() -> void:
-			if _onboarding_box != null:
-				_onboarding_box.visible = false
-		)
+	_directive_step = step
+	_directive_pulse_time = 0.0
+	_update_directive_ui()
+	_flash_vignette(UITheme.HEALTHY, 0.25, 0.6)
+	if _directive_overlay != null:
+		_directive_overlay.queue_redraw()
+	if step == 5 and GameState.speed_index >= 1 and not GameState.is_paused():
+		_complete_directives()
 
 
-func _complete_onboarding_step(idx: int) -> void:
-	if not _onboard_active or idx < 0 or idx >= _onboard_steps_done.size():
+func _update_directive_ui() -> void:
+	if _directive_step_label == null or _directive_body_label == null:
 		return
-	if bool(_onboard_steps_done[idx]):
-		return
-	_onboard_steps_done[idx] = true
-	_update_onboarding_ui()
-
-	var all_done: bool = true
-	for s in _onboard_steps_done:
-		if not bool(s):
-			all_done = false
-			break
-	if all_done:
-		_on_all_onboarding_done()
-
-
-func _update_onboarding_ui() -> void:
-	for i in range(mini(_onboarding_steps.size(), _onboard_steps_done.size())):
-		var d: Dictionary = _onboarding_steps[i]
-		var done: bool = bool(_onboard_steps_done[i])
-		var ic: Icons = d["icon"]
-		var lb: Label = d["label"]
-		if done:
-			ic.set_icon("check", UITheme.HEALTHY, 14.0)
-			lb.add_theme_color_override("font_color", UITheme.HEALTHY)
+	_directive_step_label.text = I18n.t("directive.title") + " · " + I18n.t("directive.step_fmt", {"cur": str(_directive_step), "total": "5"})
+	for i in range(_directive_pips.size()):
+		var pip: Label = _directive_pips[i]
+		if i + 1 < _directive_step:
+			pip.text = "✓"
+			pip.add_theme_color_override("font_color", UITheme.HEALTHY)
+		elif i + 1 == _directive_step:
+			pip.text = "◉"
+			pip.add_theme_color_override("font_color", UITheme.AMBER)
 		else:
-			ic.set_icon("target", UITheme.TEXT_DIM, 14.0)
-			lb.add_theme_color_override("font_color", UITheme.TEXT)
+			pip.text = "○"
+			pip.add_theme_color_override("font_color", UITheme.TEXT_DIM)
+	if _directive_action_btn != null:
+		_directive_action_btn.visible = _directive_step == 5
+	var key: String = "directive.step%d" % clampi(_directive_step, 1, 5)
+	_directive_body_label.text = I18n.t(key)
 
 
-func _on_all_onboarding_done() -> void:
-	if _onboarding_done_label != null:
-		_onboarding_done_label.visible = true
-	_flash_vignette(UITheme.HEALTHY, 0.35, 1.0)
+func _on_directive_action_pressed() -> void:
+	GameState.set_speed(1)
+	_complete_directives()
+
+
+func is_directive_active() -> bool:
+	return _directive_active
+
+
+func directive_step() -> int:
+	return _directive_step
+
+
+func complete_directives() -> void:
+	if _directive_active:
+		_complete_directives()
+
+
+func _dismiss_directives() -> void:
+	if not _directive_active:
+		return
+	_directive_active = false
+	if _directive_box != null:
+		var tw := create_tween()
+		tw.tween_property(_directive_box, "modulate:a", 0.0, 0.3)
+		tw.tween_callback(func() -> void:
+			if _directive_box != null:
+				_directive_box.visible = false
+		)
+	if _directive_overlay != null:
+		_directive_overlay.queue_redraw()
+
+
+func _complete_directives() -> void:
+	_directive_active = false
+	if GameState.speed_index == 0:
+		GameState.set_speed(1)
+	AudioSynth.play_policy_adopt()
+	_flash_vignette(UITheme.HEALTHY, 0.45, 1.2)
+	for pip in _directive_pips:
+		pip.text = "✓"
+		pip.add_theme_color_override("font_color", UITheme.HEALTHY)
+	_directive_step_label.text = I18n.t("directive.title")
+	_directive_body_label.text = "[color=#4ade80]" + I18n.t("directive.done") + "[/color]"
+	if _directive_overlay != null:
+		_directive_overlay.queue_redraw()
 	var tw := create_tween()
-	tw.tween_interval(2.5)
-	tw.tween_property(_onboarding_box, "modulate:a", 0.0, 0.5)
+	tw.tween_interval(3.5)
+	tw.tween_property(_directive_box, "modulate:a", 0.0, 0.5)
 	tw.tween_callback(func() -> void:
-		_onboard_active = false
-		if _onboarding_box != null:
-			_onboarding_box.visible = false
+		if _directive_box != null:
+			_directive_box.visible = false
 	)
 
 
-# --- 5-Step Guided Spotlight Tutorial ---------------------------------------------------
+func _on_directive_overlay_draw() -> void:
+	if not _directive_active or _directive_step < 1 or _directive_step > 5:
+		return
+	var pulse: float = 0.5 + 0.5 * sin(_directive_pulse_time * 6.0)
+	var col: Color = UITheme.HEALTHY if _directive_step in [1, 2, 3] else UITheme.AMBER
+	var c := UITheme.with_alpha(col, 0.4 + 0.55 * pulse)
 
-func _build_tactical_briefing() -> void:
-	_briefing_modal = Control.new()
-	_briefing_modal.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
-	_briefing_modal.mouse_filter = Control.MOUSE_FILTER_STOP
-	_briefing_modal.visible = false
-	_briefing_modal.z_index = 25
-	add_child(_briefing_modal)
+	var target_rect: Rect2 = Rect2()
+	match _directive_step:
+		1:
+			if map != null and map.has_method("region_screen_pos"):
+				var pt: Vector2 = map.region_screen_pos("antalya")
+				target_rect = Rect2(pt - Vector2(60.0, 40.0), Vector2(120.0, 80.0))
+		2:
+			if _action_rows.size() > 0 and is_instance_valid(_action_rows[0].get("button")):
+				var btn: Button = _action_rows[0]["button"]
+				target_rect = btn.get_global_rect()
+		3:
+			var bubbles: Array = GameState.active_bubbles()
+			if not bubbles.is_empty() and map != null and map.has_method("region_screen_pos"):
+				var b_reg: String = str(bubbles[0].get("region", "antalya"))
+				var pt: Vector2 = map.region_screen_pos(b_reg) + Vector2(30.0, -25.0)
+				target_rect = Rect2(pt - Vector2(32.0, 32.0), Vector2(64.0, 64.0))
+			elif map != null and map.has_method("region_screen_pos"):
+				var pt: Vector2 = map.region_screen_pos("antalya") + Vector2(30.0, -25.0)
+				target_rect = Rect2(pt - Vector2(32.0, 32.0), Vector2(64.0, 64.0))
+		4:
+			if is_instance_valid(_tree_btn):
+				target_rect = _tree_btn.get_global_rect()
+		5:
+			if _speed_buttons.size() > 1 and is_instance_valid(_speed_buttons[1]):
+				var spd_btn: Button = _speed_buttons[1]
+				target_rect = spd_btn.get_global_rect()
 
-	_briefing_backdrop = Control.new()
-	_briefing_backdrop.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
-	_briefing_backdrop.mouse_filter = Control.MOUSE_FILTER_STOP
-	_briefing_backdrop.draw.connect(_on_briefing_backdrop_draw)
-	_briefing_modal.add_child(_briefing_backdrop)
+	if target_rect.size != Vector2.ZERO:
+		var pad: float = 6.0 + 3.0 * pulse
+		var r: Rect2 = target_rect.grow(pad)
+		_directive_overlay.draw_rect(r, UITheme.with_alpha(col, 0.08 * pulse))
+		_directive_overlay.draw_rect(r, c, false, 2.0)
+		var blen: float = 14.0
+		_directive_overlay.draw_line(r.position, r.position + Vector2(blen, 0), c, 2.5)
+		_directive_overlay.draw_line(r.position, r.position + Vector2(0, blen), c, 2.5)
+		_directive_overlay.draw_line(Vector2(r.end.x, r.position.y), Vector2(r.end.x - blen, r.position.y), c, 2.5)
+		_directive_overlay.draw_line(Vector2(r.end.x, r.position.y), Vector2(r.end.x, r.position.y + blen), c, 2.5)
+		_directive_overlay.draw_line(r.end, r.end - Vector2(blen, 0), c, 2.5)
+		_directive_overlay.draw_line(r.end, r.end - Vector2(0, blen), c, 2.5)
+		_directive_overlay.draw_line(Vector2(r.position.x, r.end.y), Vector2(r.position.x + blen, r.end.y), c, 2.5)
+		_directive_overlay.draw_line(Vector2(r.position.x, r.end.y), Vector2(r.position.x, r.end.y - blen), c, 2.5)
+
+
+# --- Tactical Field Manual (Clean 1-Page [?] Reference Guide) -----------------------------
+
+func _build_manual_modal() -> void:
+	_help_modal = Control.new()
+	_help_modal.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	_help_modal.mouse_filter = Control.MOUSE_FILTER_STOP
+	_help_modal.visible = false
+	_help_modal.z_index = 35
+	add_child(_help_modal)
+
+	_help_backdrop = Control.new()
+	_help_backdrop.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	_help_backdrop.mouse_filter = Control.MOUSE_FILTER_STOP
+	_help_backdrop.draw.connect(func() -> void:
+		_help_backdrop.draw_rect(_help_backdrop.get_rect(), Color(0.015, 0.025, 0.05, 0.88))
+	)
+	_help_modal.add_child(_help_backdrop)
 
 	var card := PanelContainer.new()
-	card.custom_minimum_size = Vector2(700.0, 440.0)
+	card.custom_minimum_size = Vector2(920.0, 600.0)
 	card.mouse_filter = Control.MOUSE_FILTER_STOP
-	var sb: StyleBoxFlat = UITheme.panel_box(UITheme.LINE_AMBER, UITheme.with_alpha(UITheme.BG_PANEL, 0.98), 2, UITheme.with_alpha(UITheme.AMBER, 0.2), 24, 16)
+	var sb: StyleBoxFlat = UITheme.panel_box(UITheme.LINE_AMBER, UITheme.with_alpha(UITheme.BG_PANEL, 0.98), 2, UITheme.with_alpha(UITheme.AMBER, 0.25), 24, 16)
 	sb.content_margin_left = 32.0
 	sb.content_margin_right = 32.0
 	sb.content_margin_top = 24.0
@@ -1497,151 +1585,117 @@ func _build_tactical_briefing() -> void:
 	card.anchor_top = 0.5
 	card.anchor_right = 0.5
 	card.anchor_bottom = 0.5
-	card.offset_left = -350.0
-	card.offset_top = -220.0
-	card.offset_right = 350.0
-	card.offset_bottom = 220.0
-	_briefing_modal.add_child(card)
+	card.offset_left = -460.0
+	card.offset_top = -300.0
+	card.offset_right = 460.0
+	card.offset_bottom = 300.0
+	_help_modal.add_child(card)
 
-	var col := _vbox(16)
+	var col := _vbox(14)
 	card.add_child(col)
 
 	var top := _hbox(12)
 	col.add_child(top)
-	var badge := PanelContainer.new()
-	badge.add_theme_stylebox_override("panel", UITheme.badge_box(UITheme.AMBER))
-	var badge_lbl := _label("BadgeLabel", "tut.title")
-	badge.add_child(badge_lbl)
-	top.add_child(badge)
+	top.add_child(_icon("help", UITheme.AMBER, 22.0))
+	var title_l := _label("HeaderLabel", "manual.title")
+	title_l.add_theme_font_size_override("font_size", 18)
+	title_l.add_theme_color_override("font_color", UITheme.AMBER.lerp(Color.WHITE, 0.3))
+	top.add_child(title_l)
 	top.add_child(_spacer())
-	_briefing_step_label = _label("SmallLabel")
-	_briefing_step_label.add_theme_font_override("font", UITheme.mono_bold_font())
-	_briefing_step_label.add_theme_color_override("font_color", UITheme.TEXT_DIM)
-	top.add_child(_briefing_step_label)
+
+	var close_btn := Button.new()
+	close_btn.theme_type_variation = &"ChipButton"
+	close_btn.text = "✕"
+	close_btn.mouse_default_cursor_shape = Control.CURSOR_POINTING_HAND
+	close_btn.pressed.connect(_close_manual)
+	top.add_child(close_btn)
 
 	col.add_child(_sep())
 
-	var content_box := _vbox(12)
-	content_box.size_flags_vertical = Control.SIZE_EXPAND_FILL
-	col.add_child(content_box)
+	var grid := GridContainer.new()
+	grid.columns = 2
+	grid.add_theme_constant_override("h_separation", 16)
+	grid.add_theme_constant_override("v_separation", 14)
+	grid.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	col.add_child(grid)
 
-	var card_head := _hbox(12)
-	content_box.add_child(card_head)
-	_briefing_card_icon = _icon("sea_health", UITheme.AMBER, 34.0)
-	card_head.add_child(_briefing_card_icon)
-	_briefing_card_title = _label("HeaderLabel")
-	_briefing_card_title.add_theme_font_size_override("font_size", 19)
-	_briefing_card_title.add_theme_color_override("font_color", UITheme.AMBER.lerp(Color.WHITE, 0.25))
-	card_head.add_child(_briefing_card_title)
+	var sections: Array = [
+		["budget", "manual.sec1.title", "manual.sec1.body", UITheme.HEALTHY],
+		["warning", "manual.sec2.title", "manual.sec2.body", UITheme.CRISIS],
+		["crosshair", "manual.sec3.title", "manual.sec3.body", UITheme.AMBER],
+		["cop_summit", "manual.sec4.title", "manual.sec4.body", UITheme.SCIENCE_BLUE],
+	]
+	for sec in sections:
+		var ico_id: String = sec[0]
+		var sec_title_k: String = sec[1]
+		var sec_body_k: String = sec[2]
+		var accent: Color = sec[3]
 
-	_briefing_card_text = RichTextLabel.new()
-	_briefing_card_text.bbcode_enabled = true
-	_briefing_card_text.fit_content = false
-	_briefing_card_text.size_flags_vertical = Control.SIZE_EXPAND_FILL
-	_briefing_card_text.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	_briefing_card_text.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	_briefing_card_text.add_theme_font_override("normal_font", UITheme.body_font())
-	_briefing_card_text.add_theme_font_override("bold_font", UITheme.mono_bold_font())
-	_briefing_card_text.add_theme_font_size_override("normal_font_size", 15)
-	_briefing_card_text.add_theme_font_size_override("bold_font_size", 15)
-	_briefing_card_text.add_theme_color_override("default_color", UITheme.TEXT)
-	content_box.add_child(_briefing_card_text)
+		var sec_panel := PanelContainer.new()
+		sec_panel.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		sec_panel.size_flags_vertical = Control.SIZE_EXPAND_FILL
+		var sec_sb: StyleBoxFlat = UITheme.panel_box(UITheme.LINE_DIM, UITheme.with_alpha(UITheme.DEEP, 0.85), 1, Color(0, 0, 0, 0), 0, 8)
+		sec_sb.content_margin_left = 14.0
+		sec_sb.content_margin_right = 14.0
+		sec_sb.content_margin_top = 10.0
+		sec_sb.content_margin_bottom = 10.0
+		sec_panel.add_theme_stylebox_override("panel", sec_sb)
+		grid.add_child(sec_panel)
+
+		var scol := _vbox(6)
+		sec_panel.add_child(scol)
+
+		var shead := _hbox(8)
+		scol.add_child(shead)
+		shead.add_child(_icon(ico_id, accent, 18.0))
+		var stitle := _label("HeaderLabel", sec_title_k)
+		stitle.add_theme_font_size_override("font_size", 13)
+		stitle.add_theme_color_override("font_color", accent.lerp(Color.WHITE, 0.25))
+		shead.add_child(stitle)
+
+		var sbody := RichTextLabel.new()
+		sbody.bbcode_enabled = true
+		sbody.fit_content = true
+		sbody.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		sbody.add_theme_font_override("normal_font", UITheme.body_font())
+		sbody.add_theme_font_size_override("normal_font_size", 12)
+		sbody.add_theme_color_override("default_color", UITheme.TEXT)
+		sbody.text = I18n.t(sec_body_k)
+		scol.add_child(sbody)
 
 	col.add_child(_sep())
 
 	var btm := _hbox(12)
+	btm.alignment = BoxContainer.ALIGNMENT_CENTER
 	col.add_child(btm)
-	_briefing_skip_btn = Button.new()
-	_briefing_skip_btn.theme_type_variation = &"ChipButton"
-	_briefing_skip_btn.text = I18n.t("tut.btn.skip")
-	_briefing_skip_btn.mouse_default_cursor_shape = Control.CURSOR_POINTING_HAND
-	_briefing_skip_btn.pressed.connect(_close_briefing)
-	btm.add_child(_briefing_skip_btn)
-	btm.add_child(_spacer())
 
-	_briefing_prev_btn = Button.new()
-	_briefing_prev_btn.theme_type_variation = &"SecondaryButton"
-	_briefing_prev_btn.custom_minimum_size = Vector2(100.0, 36.0)
-	_briefing_prev_btn.text = I18n.t("tut.btn.prev")
-	_briefing_prev_btn.mouse_default_cursor_shape = Control.CURSOR_POINTING_HAND
-	_briefing_prev_btn.pressed.connect(_on_briefing_prev)
-	btm.add_child(_briefing_prev_btn)
-
-	_briefing_next_btn = Button.new()
-	_briefing_next_btn.theme_type_variation = &"PrimaryButton"
-	_briefing_next_btn.custom_minimum_size = Vector2(140.0, 36.0)
-	_briefing_next_btn.text = I18n.t("tut.btn.next")
-	_briefing_next_btn.mouse_default_cursor_shape = Control.CURSOR_POINTING_HAND
-	_briefing_next_btn.pressed.connect(_on_briefing_next)
-	btm.add_child(_briefing_next_btn)
+	var ok_btn := Button.new()
+	ok_btn.theme_type_variation = &"PrimaryButton"
+	ok_btn.custom_minimum_size = Vector2(220.0, 38.0)
+	ok_btn.text = I18n.t("manual.close")
+	ok_btn.mouse_default_cursor_shape = Control.CURSOR_POINTING_HAND
+	ok_btn.pressed.connect(_close_manual)
+	btm.add_child(ok_btn)
 
 
-func _on_briefing_backdrop_draw() -> void:
-	if _briefing_backdrop == null:
-		return
-	var r := _briefing_backdrop.get_rect()
-	_briefing_backdrop.draw_rect(r, Color(0.015, 0.025, 0.05, 0.85))
+func _show_manual() -> void:
+	if _help_modal != null:
+		_help_modal.visible = true
+		GameState.set_pause_reason("manual", true)
 
 
-func _show_tactical_briefing() -> void:
-	_briefing_step = 1
-	_briefing_modal.visible = true
-	GameState.set_pause_reason("briefing", true)
-	_update_briefing_card()
+func _close_manual() -> void:
+	if _help_modal != null:
+		_help_modal.visible = false
+		GameState.set_pause_reason("manual", false)
 
 
-func _close_briefing() -> void:
-	_briefing_modal.visible = false
-	GameState.set_pause_reason("briefing", false)
-	_start_onboarding()
+func is_manual_open() -> bool:
+	return _help_modal != null and _help_modal.visible
 
 
-func _on_briefing_prev() -> void:
-	if _briefing_step > 1:
-		_briefing_step -= 1
-		_update_briefing_card()
-
-
-func _on_briefing_next() -> void:
-	if _briefing_step < 5:
-		_briefing_step += 1
-		_update_briefing_card()
-	else:
-		_close_briefing()
-
-
-func _update_briefing_card() -> void:
-	_briefing_step_label.text = I18n.t("briefing.step_fmt", {"cur": str(_briefing_step), "total": "5"})
-	_briefing_prev_btn.disabled = _briefing_step <= 1
-	if _briefing_step >= 5:
-		_briefing_next_btn.text = I18n.t("tut.btn.start")
-	else:
-		_briefing_next_btn.text = I18n.t("tut.btn.next")
-	_briefing_skip_btn.text = I18n.t("tut.btn.skip")
-	_briefing_prev_btn.text = I18n.t("tut.btn.prev")
-	match _briefing_step:
-		1:
-			_briefing_card_icon.set_icon("sea_health", UITheme.AMBER, 34.0)
-			_briefing_card_title.text = I18n.t("tut.step1.title")
-			_briefing_card_text.text = I18n.t("tut.step1.body")
-		2:
-			_briefing_card_icon.set_icon("budget", UITheme.AMBER, 34.0)
-			_briefing_card_title.text = I18n.t("tut.step2.title")
-			_briefing_card_text.text = I18n.t("tut.step2.body")
-		3:
-			_briefing_card_icon.set_icon("clean", UITheme.HEALTHY, 34.0)
-			_briefing_card_title.text = I18n.t("tut.step3.title")
-			_briefing_card_text.text = I18n.t("tut.step3.body")
-		4:
-			_briefing_card_icon.set_icon("tree", UITheme.SCIENCE_BLUE, 34.0)
-			_briefing_card_title.text = I18n.t("tut.step4.title")
-			_briefing_card_text.text = I18n.t("tut.step4.body")
-		5:
-			_briefing_card_icon.set_icon("warning", UITheme.CRISIS, 34.0)
-			_briefing_card_title.text = I18n.t("tut.step5.title")
-			_briefing_card_text.text = I18n.t("tut.step5.body")
-	if _briefing_backdrop != null:
-		_briefing_backdrop.queue_redraw()
+func close_manual() -> void:
+	_close_manual()
 
 
 # --- COP31 Diplomatic Summits Modal (2031, 2036, 2041) -----------------------------------
@@ -1936,7 +1990,7 @@ func _on_res_hover(block: Control, key: String) -> void:
 
 func _on_species_hover(block: Control) -> void:
 	var title: String = I18n.t("hud.species.title")
-	var body: String = I18n.t("hud.species.turtle.desc") + "\n\n" + I18n.t("hud.species.seal.desc")
+	var body: String = I18n.t("hud.species.body")
 	_show_tip(block, title, body, I18n.t("hud.species.tip"), "below")
 
 
@@ -2191,7 +2245,7 @@ func _on_game_started() -> void:
 	_update_difficulty_badge(str(_snap.get("difficulty", GameState.selected_difficulty)))
 	if _audio_icon != null:
 		_audio_icon.set_icon("sound_off" if AudioSynth.is_muted else "sound_on", UITheme.TEXT_DIM if AudioSynth.is_muted else UITheme.TEXT, 15.0)
-	_show_tactical_briefing()
+	_start_directives()
 
 
 func _on_tick_done(snapshot: Dictionary) -> void:
@@ -2494,12 +2548,17 @@ func _on_tree_toggled(is_open: bool) -> void:
 	_hide_tip_now()
 	if not is_open:
 		_update_tree_status()
+	if _directive_active and _directive_step == 4 and is_open:
+		AudioSynth.play_policy_adopt()
+		_set_directive_step(5)
 
 
 func _on_node_adopted(_node_id: String) -> void:
 	_update_tree_status()
 	_update_pressure()
-	_complete_onboarding_step(2)
+	if _directive_active and _directive_step == 4:
+		AudioSynth.play_policy_adopt()
+		_set_directive_step(5)
 	_flash_vignette(UITheme.HEALTHY, 0.40, 1.0)
 
 
@@ -2521,7 +2580,8 @@ func _on_spread_happened(_from_id: String, _to_id: String) -> void:
 
 
 func _on_bubble_collected(_bubble_id: int, kind: String, amount: float) -> void:
-	_complete_onboarding_step(1)
+	if _directive_active and _directive_step == 3:
+		_set_directive_step(4)
 	var vs: Vector2 = get_viewport_rect().size
 	var pos := Vector2(vs.x * 0.5 - 40.0, vs.y * 0.45)
 	var col: Color = RES_COLORS.get(kind, UITheme.HEALTHY)
@@ -2561,8 +2621,9 @@ func _on_region_selected(region_id: String) -> void:
 
 func _select_region(region_id: String) -> void:
 	_selected = region_id
-	if region_id != "":
-		_complete_onboarding_step(0)
+	if _directive_active and _directive_step == 1 and (region_id == "antalya" or region_id != ""):
+		AudioSynth.play_click()
+		_set_directive_step(2)
 	_region = {}
 	if region_id != "":
 		_region = GameState.get_region(region_id)
@@ -2629,26 +2690,52 @@ func _update_region(data: Dictionary, force: bool) -> void:
 	else:
 		_region_trait_box.visible = false
 
+	# Biodiversity species for this region
+	var rid: String = str(data.get("id", _selected))
+	if rid in ["antalya", "aegean"]:
+		_region_species_badge.visible = true
+		_region_species_icon.set_icon("turtle", UITheme.HEALTHY, 14.0)
+		var nests: int = int(_snap.get("turtle_nests", 0))
+		_region_species_label.text = I18n.t("hud.species.caretta_nests", {"n": str(nests)})
+	elif rid in ["marmara", "adriatic"]:
+		_region_species_badge.visible = true
+		_region_species_icon.set_icon("seal", UITheme.SCIENCE_BLUE, 14.0)
+		var seals: int = int(_snap.get("monk_seals", 0))
+		_region_species_label.text = I18n.t("hud.species.monk_seals", {"n": str(seals)})
+	else:
+		_region_species_badge.visible = false
+
+	# Monthly Dynamics Net Trend Badge
 	var bd: Dictionary = data.get("breakdown", {})
 	if not bd.is_empty():
-		_bd_box.visible = true
-		if _bd_labels.has("shipping"):
-			_bd_labels["shipping"].text = "+%.1f" % float(bd.get("shipping", 0.0))
-		if _bd_labels.has("currents"):
-			_bd_labels["currents"].text = "+%.1f" % float(bd.get("currents", 0.0))
-		if _bd_labels.has("coastal"):
-			_bd_labels["coastal"].text = "+%.1f" % float(bd.get("coastal", 0.0))
-		if _bd_labels.has("heat"):
-			_bd_labels["heat"].text = "+%.1f" % float(bd.get("heat", 0.0))
-		if _bd_labels.has("shield"):
-			_bd_labels["shield"].text = "-%.1f" % float(bd.get("shield", 0.0))
-		if _bd_labels.has("net"):
-			var net_val: float = float(bd.get("net", 0.0))
-			_bd_labels["net"].text = ("+" if net_val >= 0.0 else "") + "%.1f/ay" % net_val
-			var net_col: Color = UITheme.CRISIS if net_val > 0.05 else (UITheme.HEALTHY if net_val < -0.05 else UITheme.TEXT_DIM)
-			_bd_labels["net"].add_theme_color_override("font_color", net_col)
+		_region_trend_badge.visible = true
+		var net_val: float = float(bd.get("net", 0.0))
+		var is_improving: bool = net_val <= -0.05
+		var is_worsening: bool = net_val > 0.05
+		var col_hint: Color = UITheme.HEALTHY if is_improving else (UITheme.CRISIS if is_worsening else UITheme.TEXT_DIM)
+		var sign_str: String = "+" if net_val > 0.0 else ""
+		_region_trend_label.text = I18n.t("hud.trend.fmt", {"trend": sign_str + "%.1f/ay" % net_val})
+		_region_trend_label.add_theme_color_override("font_color", col_hint)
+		_region_trend_icon.set_icon("trend_down" if is_improving else "trend_up", col_hint, 13.0)
+		_region_trend_badge.add_theme_stylebox_override("panel", UITheme.badge_box(col_hint))
 	else:
-		_bd_box.visible = false
+		_region_trend_badge.visible = false
+
+
+func _on_trend_hover() -> void:
+	if _region.is_empty():
+		return
+	var bd: Dictionary = _region.get("breakdown", {})
+	var lines: Array = [
+		I18n.t("hud.trend.tip"),
+		"",
+		"Gemi Hatları: +%.1f" % float(bd.get("shipping", 0.0)),
+		"Deniz Akıntıları: +%.1f" % float(bd.get("currents", 0.0)),
+		"Kıyı Nüfusu: +%.1f" % float(bd.get("coastal", 0.0)),
+		"Isınma Etkisi: +%.1f" % float(bd.get("heat", 0.0)),
+		"Koruma Kalkanı: -%.1f" % float(bd.get("shield", 0.0)),
+	]
+	_show_tip(_region_trend_badge, I18n.t("hud.breakdown.title"), "\n".join(lines), "", "left_of")
 
 
 func _refresh_actions() -> void:
@@ -2717,6 +2804,9 @@ func _on_action_pressed(action_id: String) -> void:
 
 
 func _on_action_performed(action_id: String, region_id: String) -> void:
+	if _directive_active and _directive_step == 2 and action_id == "cleanup":
+		GameState.spawn_tutorial_bubble("science", "antalya")
+		_set_directive_step(3)
 	if region_id != _selected:
 		return
 	for r in _action_rows:
@@ -2778,14 +2868,16 @@ func _on_speed_changed(speed_index: int) -> void:
 			if lbl != null:
 				lbl.add_theme_color_override("font_color", fg)
 	_chip_on = speed_index == 0 and GameState.running
-	if speed_index >= 1 and not GameState.is_paused():
-		_complete_onboarding_step(3)
+	if speed_index >= 1:
+		if _directive_active and _directive_step == 5:
+			_complete_directives()
 
 
 func _on_paused_changed(paused: bool) -> void:
 	_on_speed_changed(GameState.speed_index)
 	if not paused and GameState.speed_index >= 1:
-		_complete_onboarding_step(3)
+		if _directive_active and _directive_step == 5:
+			_complete_directives()
 
 
 func _on_language_changed(_lang: String) -> void:
@@ -2814,8 +2906,8 @@ func _on_language_changed(_lang: String) -> void:
 	_update_tree_status()
 	_update_defcon(_defcon_level)
 	_update_difficulty_badge(str(_snap.get("difficulty", GameState.selected_difficulty)))
-	if _briefing_modal != null and _briefing_modal.visible:
-		_update_briefing_card()
+	if _directive_active:
+		_update_directive_ui()
 	_hide_tip_now()
 	call_deferred("_shrink_panels")
 
@@ -2860,12 +2952,10 @@ func _process(delta: float) -> void:
 	_guard_toasts()
 	if _vignette != null and _vignette_alpha > 0.0:
 		_vignette.queue_redraw()
-	if _onboard_active:
-		_onboard_time_left = maxf(0.0, _onboard_time_left - delta)
-		if _onboarding_timer_label != null:
-			_onboarding_timer_label.text = "%ds" % ceilf(_onboard_time_left)
-		if _onboard_time_left <= 0.0:
-			_dismiss_onboarding()
+	if _directive_active:
+		_directive_pulse_time += delta
+		if _directive_overlay != null:
+			_directive_overlay.queue_redraw()
 	_process_phase2(delta)
 
 
